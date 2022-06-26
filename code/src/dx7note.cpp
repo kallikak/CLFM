@@ -61,15 +61,14 @@ const int32_t coarsemul[] = {
   81503396, 82323963, 83117622
 };
 
-#define CALIBRATION 51
+#define CALIBRATION 0
 
 // ScaleLevel: break_pt = 33, left_depth = 0, right_depth = 0, left_curve = 0, right_curve = 0
 // ScaleCurve: group = 17, depth = 0, curve = 0
 // ScaleVelocity: velocity = 0, sensitivity = 0
 #define BREAK_PT 33
 #define DEF_DEPTH 0
-#define VELOCITY 0
-#define SENSITIVITY 0
+#define SENSITIVITY 7
 
 int32_t osc_freq(float midinote, int mode, int coarse, int fine, int detune) {
   // TODO: pitch randomization
@@ -84,12 +83,12 @@ int32_t osc_freq(float midinote, int mode, int coarse, int fine, int detune) {
       logfreq += f * (logfreq1 - logfreq);
     }
 
-    if (detune)
+    if (detune) // detune from -7 to 7
     {
       // could use more precision, closer enough for now. those numbers comes from my DX7
       //FRAC_NUM detuneRatio = 0.0209 * exp(-0.396 * (((float)logfreq) / (1 << 24))) / 7;
       FRAC_NUM detuneRatio = 0.0209 * EXP_FUNC(-0.396 * (((float)logfreq) / (1 << 24))) / 7;
-      logfreq += detuneRatio * logfreq * (detune - 7);
+      logfreq += detuneRatio * logfreq * detune;
     }
 
     logfreq += coarsemul[coarse & 31];
@@ -107,7 +106,7 @@ int32_t osc_freq(float midinote, int mode, int coarse, int fine, int detune) {
   } else {  // fixed mode
     // ((1 << 24) * log(10) / log(2) * .01) << 3
     logfreq = (4458616 * ((coarse & 3) * 100 + fine)) >> 3;
-    logfreq += detune > 7 ? 13457 * (detune - 7) : 0;
+    logfreq += detune > 7 ? 13457 * detune : 0;
   }
   return logfreq;
 }
@@ -197,7 +196,7 @@ void Dx7Note::init(uint8_t algorithm, float midinote, int velocity) {
     int mode = 0;
     int coarse = (int)(config.coarse[op]);
     int fine = config.fine[op];
-    int detune = 0;
+    int detune = config.detune;
     int32_t freq = osc_freq(midinote, mode, coarse, fine, detune);
     opMode[op] = mode;
     basepitch_[op] = freq;
@@ -309,7 +308,7 @@ void Dx7Note::updatePitchOnly(float pitch)
   for (int op = 0; op < 4; op++) {
     int coarse = (int)(config.coarse[op]);
     int fine = config.fine[op];
-    basepitch_[op] = osc_freq(pitch, 0, coarse, fine, 0);
+    basepitch_[op] = osc_freq(pitch, 0, coarse, fine, config.detune);
   }
 }
 
@@ -324,7 +323,7 @@ void Dx7Note::update(uint8_t algorithm, float midinote, int velocity, bool refre
     int mode = 0;
     int coarse = (int)(config.coarse[op]);
     int fine = config.fine[op];
-    int detune = 0;
+    int detune = config.detune;
     int32_t freq = osc_freq(midinote, mode, coarse, fine, detune);
     basepitch_[op] = freq;
     opMode[op] = mode;

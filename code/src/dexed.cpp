@@ -52,7 +52,6 @@ Dexed::Dexed(uint8_t maxnotes, int rate)
   // voices=NULL;
 
   setMaxNotes(max_notes);
-  setMonoMode(false);
   // loadInitVoice();
 
   xrun = 0;
@@ -287,33 +286,11 @@ void Dexed::keydown(int16_t pitch, uint8_t velo) {
   uint8_t note = currentNote;
   uint8_t keydown_counter = 0;
 
-  if (!monoMode && refreshMode)
-  {
-    for (uint8_t i = 0; i < max_notes; i++)
-    {
-      if (voices[i].midi_note == pitch && voices[i].keydown == false && voices[i].live)
-      {
-        // retrigger or refresh note?
-        voices[i].dx7_note->keyup();
-        voices[i].midi_note = pitch;
-        voices[i].velocity = velo;
-        voices[i].keydown = true;
-        voices[i].live = true;
-        voices[i].dx7_note->init(algorithm, pitch, velo);
-        voices[i].key_pressed_timer = millis();
-        return;
-      }
-    }
-  }
-
   for (uint8_t i = 0; i <= max_notes; i++)
   {
     if (i == max_notes)
     {
       uint32_t min_timer = 0xffff;
-
-      if (monoMode)
-        break;
 
       // no free sound slot found, so use the oldest note slot
       for (uint8_t n = 0; n < max_notes; n++)
@@ -348,25 +325,6 @@ void Dexed::keydown(int16_t pitch, uint8_t velo) {
     note = (note + 1) % max_notes;
   }
 
-  if ( monoMode ) {
-    for (uint8_t i = 0; i < max_notes; i++) {
-      if ( voices[i].live ) {
-        // all keys are up, only transfer signal
-        if ( ! voices[i].keydown ) {
-          voices[i].live = false;
-          voices[note].dx7_note->transferSignal(*voices[i].dx7_note);
-          break;
-        }
-        if ( voices[i].midi_note < pitch ) {
-          voices[i].live = false;
-          voices[note].dx7_note->transferState(*voices[i].dx7_note);
-          break;
-        }
-        return;
-      }
-    }
-  }
-
   voices[note].live = true;
 }
 
@@ -390,24 +348,6 @@ void Dexed::keyup(int16_t pitch) {
     return;
   }
 
-  if ( monoMode ) {
-    int16_t highNote = -1;
-    uint8_t target = 0;
-    for (int8_t i = 0; i < max_notes; i++) {
-      if ( voices[i].keydown && voices[i].midi_note > highNote ) {
-        target = i;
-        highNote = voices[i].midi_note;
-      }
-    }
-
-    if ( highNote != -1 && voices[note].live ) {
-      voices[note].live = false;
-      voices[note].key_pressed_timer = 0;
-      voices[target].live = true;
-      voices[target].dx7_note->transferState(*voices[note].dx7_note);
-    }
-  }
-
   voices[note].dx7_note->keyup();
 }
 
@@ -419,22 +359,6 @@ void Dexed::doRefreshEnv(void)
 void Dexed::doRefreshVoice(void)
 {
   refreshVoice = true;
-}
-
-bool Dexed::getMonoMode(void) {
-  return monoMode;
-}
-
-void Dexed::setMonoMode(bool mode) {
-  if (monoMode == mode)
-    return;
-
-  notesOff();
-  monoMode = mode;
-}
-
-void Dexed::setRefreshMode(bool mode) {
-  refreshMode = mode;
 }
 
 void Dexed::panic(void)

@@ -49,27 +49,6 @@ struct ProcessorVoice {
   Dx7Note *dx7_note;
 };
 
-enum ADSR {
-  ATTACK,
-  DECAY,
-  SUSTAIN,
-  RELEASE
-};
-
-enum OPERATORS {
-  OP1,
-  OP2,
-  OP3,
-  OP4,
-  OP5,
-  OP6
-};
-
-enum ON_OFF {
-  OFF,
-  ON
-};
-
 // GLOBALS
 
 //==============================================================================
@@ -83,9 +62,6 @@ class Dexed
     // Global methods
     void activate(void);
     void deactivate(void);
-    bool getMonoMode(void);
-    void setMonoMode(bool mode);
-    void setRefreshMode(bool mode);
     void setMaxNotes(uint8_t n);
     uint8_t getMaxNotes(void);
     void doRefreshVoice(void);
@@ -113,8 +89,6 @@ class Dexed
     uint8_t max_notes;
     int16_t currentNote;
     float vuSignal;
-    bool monoMode;
-    bool refreshMode;
     bool refreshVoice;
     bool refreshEnv;
     uint8_t engineType;

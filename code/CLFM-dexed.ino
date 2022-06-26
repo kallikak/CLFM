@@ -6,16 +6,22 @@
 #include <SPI.h>
 #include <SerialFlash.h>
 
+#include <USBHost_t36.h>
+
+USBHost myusb;
+USBHub hub1(myusb);
+MIDIDevice midi1(myusb);
+
+int loopcount = 0;
+
 extern "C" uint32_t set_arm_clock(uint32_t frequency);
 
 #include <ADC.h>
 
 ADC *adc = new ADC();
 
-#if CLFM_VERSION == PROTOTYPE
 #include "Bounce2.h"
 Bounce *resetsw = new Bounce();
-#endif
 
 #define NO_AVG 0
 
@@ -28,14 +34,16 @@ Bounce *resetsw = new Bounce();
 #include "Utility.h"
 
 bool idle = true;
-bool mono = false;
+bool midimode = true;
 bool quantise = true;
+
+#define PITCH_BEND_FACTOR 7
 
 bool resetpressed = false;
 
 volatile bool feedback2 = false;
 
-AudioSynthDexed         fm(1, SAMPLE_RATE);
+AudioSynthDexed         fm(4, SAMPLE_RATE);
 AudioFilterStateVariable filter;
 AudioAmplifier          amp;
 AudioOutputI2S2         i2s2;
@@ -108,7 +116,9 @@ const int envModeSw[] = { ENV_MODE_CTS, ENV_MODE_ADSR, ENV_MODE_ASR };
 #else
 #define GATE_IN 1
 #endif
-#define PITCH_OFFSET 48
+
+#define PITCH_OFFSET 60
+#define MIDI_NOTE_OFFSET 24
 
 volatile bool gate = LOW;
 volatile bool gatetoggled = false;
@@ -148,7 +158,7 @@ void printConfig()
 {
   Serial.printf("Algorithm: %3d\n", config.algorithm + 1);
   Serial.printf("Coarse: %6s %6s %6s %6s\n", coarseFactors[config.coarse[3]], coarseFactors[config.coarse[2]], coarseFactors[config.coarse[1]], coarseFactors[config.coarse[0]]);  
-  Serial.printf("Fine:   %6d %6d %6d %6d\n", config.fine[3] - 64, config.fine[2] - 64, config.fine[1] - 64, config.fine[0] - 64);
+  Serial.printf("Fine:   %6d %6d %6d %6d\n", config.fine[3], config.fine[2], config.fine[1], config.fine[0]);
   for (int k = 3; k >= 0; --k)
   {
     if (config.env[k].drone)
@@ -163,6 +173,8 @@ void printConfig()
 bool potchange(potval *v, unsigned long now, bool centre, bool jittery)
 {
   bool force = false;
+  if (loopcount < 2)
+    return true;  // initial update
   // extra accepting near limits
 #define LIMIT 1
   if (centre)
@@ -238,7 +250,9 @@ void setAmpGain()
 //  2 => 0.5
 //  3 => 0.4
 //  4 => 0.3
-  amp.gain(0.7 - fm.getCarrierCount() * 0.1);
+  float gain = 0.7 - fm.getCarrierCount() * 0.1;
+//  amp.gain(midimode ? gain / 4 : gain);
+  amp.gain(gain);
 }
 
 envCtrlMode getEnvMode()
@@ -478,6 +492,7 @@ bool handleCoarseTuning(int i, int v)
 
 bool handleFineTuning(int i, int v)
 {
+  v = map(v, 0, 127, -50, 50);
   if (config.fine[i] != v)
   {
     config.fine[i] = v;
@@ -529,6 +544,7 @@ bool checkEnvMode()
 
 void pin_reset() 
 {
+//  setMidiMode(!midimode);
   Serial.println("Resetting...");
   SCB_AIRCR = 0x05FA0004;
 }
@@ -653,14 +669,10 @@ void setup()
   pinMode(GATE_IN, INPUT_PULLUP);
   pinMode(CV_IN, INPUT);
   
-#if CLFM_VERSION == PROTOTYPE
   pinMode(RESET, INPUT_PULLUP);
 //  attachInterrupt(RESET, pin_reset, FALLING);
   resetsw->attach(RESET);
   resetsw->interval(50);
-#else  
-  attachInterrupt(RESET, pin_reset, FALLING);
-#endif  
   
   AudioMemory(50);
   
@@ -685,12 +697,18 @@ void setup()
   filter.frequency(6000);
   setAmpGain();
   
-  fm.setMonoMode(mono);
   resetAllDrone();
   
   config.algorithm = -1; // invalid ensures initial update
   controls.envMode = (envCtrlMode)-1; // invalid ensures initial update
+  config.detune = 0;
 
+  myusb.begin();
+
+  midi1.setHandleNoteOn(handleNoteOn);
+  midi1.setHandleNoteOff(handleNoteOff);
+  midi1.setHandlePitchChange(handlePitchChange);
+  
   Serial.println("Setup complete");
 
   for (int i = 0; i < 7; ++i)
@@ -708,7 +726,6 @@ void setup()
 
 void loop() 
 {
-  static int loopcount = 0;
   int i;
   unsigned long now = millis();
   bool needsUpdate = false;
@@ -796,7 +813,8 @@ void loop()
     if (potchange(&controls.levelpot[i], now, false, false))
     {
       long v = (uint8_t)(sqrt(controls.levelpot[i].value / 127.0) * 99);
-      config.level[i] = v;
+//      config.level[i] = midimode && getOpType(i, config.algorithm) == CARRIER ? 0.75 * v : v;
+      config.level[i] = midimode ? 0.75 * v : v;
 //      Serial.printf("Level: %d %3d %2d\n", i + 1, config.levelpot[i].value, v);
       needsUpdate = true;
     }
@@ -811,98 +829,107 @@ void loop()
     }
   }
 
+  if (updateEnv)
+    fm.doRefreshEnv();
+    
   if (needsUpdate)
   {
     fm.doRefreshVoice();
     if (showConfigOnChange)
       printConfig();
   }
-
-// TODO move the pitch cv handling to a method
-  bool releasing = fm.isReleasing();
-  if (gate || releasing)
-  {
-//    const float n = 10.0;
-    static float saveraw = 0;
-    
-    long raw = ANALOG_MAX - adc->analogRead(CV_IN);
-    int median = handleCVBuffer(raw, 1000); // maintain the median incase we are switched back
-//    if (quantise)
-      saveraw = median;      
-//    else
-//      saveraw = (n - 1) * saveraw / n + 1.0 * raw  / n;
-#if CLFM_VERSION == PROTOTYPE
-  /*
-    Calibration data
-    C2 input is 170
-    C7 input is 3620
-    scaling factor f ~ 60 / (3636 - 207)
-    36 + (2950 - 207) * f
- */
-    const float fbase = 170;
-    const float f = 60.0 / (3620 - fbase);
-#else    
-/*
-  C2 65.41Hz is 152
-  C7 2093Hz is 3625
-  scaling factor f ~ 60 / (3625 - 152)
-  36 + (2950 - 207) * f
-*/
-    const float fbase = 152;
-    const float f = 60.0 / (3625 - fbase);
-#endif    
   
-    float pitch_cv = (saveraw - fbase) * f;
+    myusb.Task();
+    midi1.read();
+  if (midimode)
+  {
+  }
+  else
+  {
+  // TODO move the pitch cv handling to a method
+    bool releasing = fm.isReleasing();
+    if (gate || releasing)
+    {
+  //    const float n = 10.0;
+      static float saveraw = 0;
+      
+      long raw = ANALOG_MAX - adc->analogRead(CV_IN);
+      int median = handleCVBuffer(raw, 1000); // maintain the median incase we are switched back
+  //    if (quantise)
+        saveraw = median;      
+  //    else
+  //      saveraw = (n - 1) * saveraw / n + 1.0 * raw  / n;
+  #if CLFM_VERSION == PROTOTYPE
+    /*
+      Calibration data
+      C2 input is 170
+      C7 input is 3620
+      scaling factor f ~ 60 / (3636 - 207)
+      36 + (2950 - 207) * f
+   */
+      const float fbase = 170;
+      const float f = 60.0 / (3620 - fbase);
+  #else    
+  /*
+    C2 149
+    C7 3618
+    scaling factor f ~ 60 / (3618 - 149)
+  */
+      const float fbase = 149;
+      const float f = 60.0 / (3618 - fbase);
+  #endif    
     
-    if (gate)
-    {    
-//  Serial.printf("raw: %ld, median: %d, average: %f\n", raw, median, saveraw);
-      bool newnote = false;
-      if (quantise) 
+      float pitch_cv = (saveraw - fbase) * f;
+      
+      if (gate)
       {
-        pitch_cv = round(pitch_cv);
-        newnote = abs(raw - saveraw) <= 5; // has it settled on a new value?
-      }
-      else
-      {
-        newnote = raw != saveraw;
-      }
-      if (newnote || gatetoggled)
-      {
-//        Serial.printf("Pitch_cv/raw/saveraw/rawforlastnote = %f/%d/%.1f [%.1f] %d [%d] => %d\n", 
-//          pitch_cv + PITCH_OFFSET, raw, saveraw,  abs(raw - saveraw), note, gatetoggled, newnote);
-        float notetoplay = PITCH_OFFSET + pitch_cv;
-        if (gatetoggled || notetoplay != note)
+    Serial.printf("raw: %ld, median: %d, average: %f\n", raw, median, saveraw);
+        bool newnote = false;
+        if (quantise) 
         {
-  //        if (quantise && ((mono || gatetoggled) && note >= 0))
-          if ((quantise && ((mono || gatetoggled) && note >= 0)) || (!quantise && gatetoggled)) {
-            fm.keyup((int)note);
+          pitch_cv = round(pitch_cv);
+          newnote = abs(raw - saveraw) <= 5; // has it settled on a new value?
+        }
+        else
+        {
+          newnote = raw != saveraw;
+        }
+        if (newnote || gatetoggled)
+        {
+  //        Serial.printf("Pitch_cv/raw/saveraw/rawforlastnote = %f/%d/%.1f [%.1f] %d [%d] => %d\n", 
+  //          pitch_cv + PITCH_OFFSET, raw, saveraw,  abs(raw - saveraw), note, gatetoggled, newnote);
+          float notetoplay = PITCH_OFFSET + pitch_cv;
+          if (gatetoggled || notetoplay != note)
+          {
+            if ((quantise && (gatetoggled && note >= 0)) || (!quantise && gatetoggled)) {
+              fm.keyup((int)note);
+            }
+            note = PITCH_OFFSET + pitch_cv;
+  //          Serial.printf("Note down: %f [%d]\n", note, (int)note);
+            if (quantise)
+              fm.keydown((int)note, 80);
+            else
+              fm.freq(note, 80);
           }
-          note = PITCH_OFFSET + pitch_cv;
-//          Serial.printf("Note down: %f [%d]\n", note, (int)note);
-          if (quantise)
-            fm.keydown((int)note, 80);
-          else
-            fm.freq(note, 80);
+        }
+        gatetoggled = false;
+      }
+      else 
+      {
+        if (releasing) {
+  //        Serial.printf("Pitch_cv/raw/saveraw/rawforlastnote = %f/%d\n", pitch_cv + PITCH_OFFSET, round(PITCH_OFFSET + pitch_cv));
+          fm.updatePitchOnly(quantise ? round(PITCH_OFFSET + pitch_cv) : PITCH_OFFSET + pitch_cv); 
         }
       }
-      gatetoggled = false;
     }
-    else 
-    {
-      if (releasing) {
-//        Serial.printf("Pitch_cv/raw/saveraw/rawforlastnote = %f/%d\n", pitch_cv + PITCH_OFFSET, round(PITCH_OFFSET + pitch_cv));
-        fm.updatePitchOnly(quantise ? round(PITCH_OFFSET + pitch_cv) : PITCH_OFFSET + pitch_cv); 
-      }
-    }
-  }
 
-  if (!gate && note >= 0) // if a note somehow got stuck...
-  {
-    Serial.println("Emergency notes off");
-    fm.keyup((int)note);
-//      fm.notesOff();
-    note = -1;
+    if (!gate && note >= 0) // if a note somehow got stuck...
+    {
+      Serial.println("Emergency notes off");
+      fm.keyup((int)note);
+  //      fm.notesOff();
+      note = -1;
+    }
   }
   
   if (!idle && loopcount % 100 == 0) {
@@ -912,9 +939,7 @@ void loop()
   }
 
   checkSerialControl();
-#if CLFM_VERSION == PROTOTYPE
   handleResetButton();
-#endif  
 }
 
 #if CLFM_VERSION == PROTOTYPE
@@ -986,4 +1011,95 @@ void handleResetLEDs()
   digitalWrite(levelLEDs[2], resetState == QUANTISE);
   digitalWrite(levelLEDs[3], resetState == FREE);
 }
+#else
+typedef enum { NONE, PANIC, MIDI, CV } ResetState;
+
+ResetState resetState = NONE;
+
+void handleResetButton()
+{
+  resetsw->update();
+  if (resetsw->read() == LOW)
+  {
+    long cd = resetsw->duration();
+    if (cd > 3000)
+    {
+      pin_reset();
+    }
+    else if (cd > 2000)
+    {
+      if (resetState != CV) resetState = CV;
+    }
+    else if (cd > 1000)
+    {
+      if (resetState != MIDI) resetState = MIDI;
+    }
+    else if (cd > 100)
+    {
+      if (resetState != PANIC) resetState = PANIC;
+    }
+    handleResetLEDs();
+  }
+  else if (resetsw->rose()) 
+  {
+    Serial.printf("Reset clicked on state %d\n", resetState);
+    switch (resetState)
+    {
+      case PANIC:
+        fm.panic();
+        break;
+      case CV:
+        setMidiMode(true);
+        break;
+      case MIDI:
+        setMidiMode(false);
+        break;
+      case NONE:
+        break;
+    }
+    resetState = NONE;
+    setAlgorithmLEDs(config.algorithm);
+  }
+}
+
+void handleResetLEDs()
+{
+  digitalWrite(levelLEDs[1], resetState == CV);
+  digitalWrite(levelLEDs[2], resetState == MIDI);
+  digitalWrite(levelLEDs[3], resetState == PANIC);
+}
 #endif  
+
+void setMidiMode(bool set)
+{
+  fm.panic();
+  if (set)
+  {
+    Serial.println("turning on midi mode");
+    fm.setMaxNotes(4);
+    midimode = true;
+  }
+  else
+  {
+    Serial.println("turning off midi mode");
+    fm.setMaxNotes(1);
+    midimode = false;
+  }
+}
+
+void handleNoteOn(byte channel, byte note, byte velocity) {
+  if (midimode)
+    fm.keydown((int16_t)note + MIDI_NOTE_OFFSET, (int8_t)velocity);
+}
+
+void handleNoteOff(byte channel, byte note, byte velocity) {
+  if (midimode)
+    fm.keyup((int16_t)note + MIDI_NOTE_OFFSET);
+}
+
+void handlePitchChange(byte channel, int pitch) {
+  pitch = map(pitch, -8192, 8192, -7 * PITCH_BEND_FACTOR, 7 * PITCH_BEND_FACTOR);
+  Serial.println(pitch);
+  config.detune = pitch;
+  fm.doRefreshVoice();
+}

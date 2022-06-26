@@ -883,7 +883,7 @@ void loop()
       
       if (gate)
       {
-    Serial.printf("raw: %ld, median: %d, average: %f\n", raw, median, saveraw);
+//    Serial.printf("raw: %ld, median: %d, average: %f\n", raw, median, saveraw);
         bool newnote = false;
         if (quantise) 
         {

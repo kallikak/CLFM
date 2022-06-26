@@ -34,7 +34,7 @@ Bounce *resetsw = new Bounce();
 #include "Utility.h"
 
 bool idle = true;
-bool midimode = true;
+bool midimode = false;
 bool quantise = true;
 
 #define PITCH_BEND_FACTOR 7
@@ -43,7 +43,7 @@ bool resetpressed = false;
 
 volatile bool feedback2 = false;
 
-AudioSynthDexed         fm(4, SAMPLE_RATE);
+AudioSynthDexed         fm(midimode ? 4 : 1, SAMPLE_RATE);
 AudioFilterStateVariable filter;
 AudioAmplifier          amp;
 AudioOutputI2S2         i2s2;
@@ -1018,6 +1018,8 @@ ResetState resetState = NONE;
 
 void handleResetButton()
 {
+  if (loopcount < 1000)
+    return; // avoid initial transients
   resetsw->update();
   if (resetsw->read() == LOW)
   {

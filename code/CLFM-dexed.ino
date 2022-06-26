@@ -6,11 +6,15 @@
 #include <SPI.h>
 #include <SerialFlash.h>
 
+#if CLFM_VERSION == RELEASE_1
 #include <USBHost_t36.h>
 
 USBHost myusb;
 USBHub hub1(myusb);
 MIDIDevice midi1(myusb);
+#endif
+
+bool midimode = false;
 
 int loopcount = 0;
 
@@ -34,7 +38,6 @@ Bounce *resetsw = new Bounce();
 #include "Utility.h"
 
 bool idle = true;
-bool midimode = false;
 bool quantise = true;
 
 #define PITCH_BEND_FACTOR 7
@@ -551,6 +554,8 @@ void pin_reset()
 
 void handle_gate()
 {
+  if (midimode)
+    return;
   gate = !digitalRead(GATE_IN);
 //  Serial.printf("Gate in is %s\n", gate ? "HIGH" : "LOW");
   if (idle && gate) 
@@ -703,11 +708,13 @@ void setup()
   controls.envMode = (envCtrlMode)-1; // invalid ensures initial update
   config.detune = 0;
 
+#if CLFM_VERSION == RELEASE_1
   myusb.begin();
 
   midi1.setHandleNoteOn(handleNoteOn);
   midi1.setHandleNoteOff(handleNoteOff);
   midi1.setHandlePitchChange(handlePitchChange);
+#endif
   
   Serial.println("Setup complete");
 
@@ -839,12 +846,11 @@ void loop()
       printConfig();
   }
   
-    myusb.Task();
-    midi1.read();
-  if (midimode)
-  {
-  }
-  else
+#if CLFM_VERSION == RELEASE_1
+  myusb.Task();
+  midi1.read();
+#endif  
+  if (!midimode)
   {
   // TODO move the pitch cv handling to a method
     bool releasing = fm.isReleasing();
@@ -1069,8 +1075,8 @@ void handleResetLEDs()
   digitalWrite(levelLEDs[1], resetState == CV);
   digitalWrite(levelLEDs[2], resetState == MIDI);
   digitalWrite(levelLEDs[3], resetState == PANIC);
+  digitalWrite(levelLEDs[0], LOW);
 }
-#endif  
 
 void setMidiMode(bool set)
 {
@@ -1080,6 +1086,7 @@ void setMidiMode(bool set)
     Serial.println("turning on midi mode");
     fm.setMaxNotes(4);
     midimode = true;
+    note = -1;
   }
   else
   {
@@ -1091,7 +1098,14 @@ void setMidiMode(bool set)
 
 void handleNoteOn(byte channel, byte note, byte velocity) {
   if (midimode)
+  {
+    if (idle)
+    {
+      idle = false;
+      set_arm_clock(600000000);  
+    }
     fm.keydown((int16_t)note + MIDI_NOTE_OFFSET, (int8_t)velocity);
+  }
 }
 
 void handleNoteOff(byte channel, byte note, byte velocity) {
@@ -1105,3 +1119,4 @@ void handlePitchChange(byte channel, int pitch) {
   config.detune = pitch;
   fm.doRefreshVoice();
 }
+#endif

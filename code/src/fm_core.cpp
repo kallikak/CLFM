@@ -142,7 +142,7 @@ void FmCore::dump() {
 #define endl "\n" 
   int i, j;
   cout << "\nFeedback on 4\n";
-  for (i = 0; i < 8; i++) {
+  for (i = 0; i < N_ALGS; i++) {
     cout << (i + 1) << ": ";
     const FmAlgorithm &alg = algorithms[i];
     for (j = 0; j < 4; j++) {
@@ -159,7 +159,7 @@ void FmCore::dump() {
     cout << endl;
   }
   cout << "\nFeedback on 2\n";
-  for (i = 8; i < 16; i++) {
+  for (i = N_ALGS; i < 2 * N_ALGS; i++) {
     cout << (i - 7) << "*:";
     const FmAlgorithm &alg = algorithms[i];
     for (j = 0; j < 4; j++) {
@@ -175,57 +175,7 @@ void FmCore::dump() {
     cout << " " << n_out(alg);
     cout << endl;
   }
-  // cout << "\n10 algo with feedback on 4\n";
-  // for (i = 16; i < 26; i++) {
-  //   cout << (i - 15) << ":";
-  //   const FmAlgorithm &alg = algorithms[i];
-  //   for (j = 0; j < 4; j++) {
-  //     int flags = alg.ops[j];
-  //     cout << " ";
-  //     if (flags & FB_IN) cout << "[";
-  //     cout << (flags & IN_BUS_ONE ? "1" : flags & IN_BUS_TWO ? "2" : "0") << "->";
-  //     cout << (flags & OUT_BUS_ONE ? "1" : flags & OUT_BUS_TWO ? "2" : "0");
-  //     if (flags & OUT_BUS_ADD) cout << "+";
-  //     //cout << alg.ops[j].in << "->" << alg.ops[j].out;
-  //     if (flags & FB_OUT) cout << "]";
-  //   }
-  //   cout << " " << n_out(alg);
-  //   cout << endl;
-  // }
-  // cout << "\n10 algo with feedback on 2\n";
-  // for (i = 26; i < 36; i++) {
-  //   cout << (i - 26) << "*:";
-  //   const FmAlgorithm &alg = algorithms[i];
-  //   for (j = 0; j < 4; j++) {
-  //     int flags = alg.ops[j];
-  //     cout << " ";
-  //     if (flags & FB_IN) cout << "[";
-  //     cout << (flags & IN_BUS_ONE ? "1" : flags & IN_BUS_TWO ? "2" : "0") << "->";
-  //     cout << (flags & OUT_BUS_ONE ? "1" : flags & OUT_BUS_TWO ? "2" : "0");
-  //     if (flags & OUT_BUS_ADD) cout << "+";
-  //     //cout << alg.ops[j].in << "->" << alg.ops[j].out;
-  //     if (flags & FB_OUT) cout << "]";
-  //   }
-  //   cout << " " << n_out(alg);
-  //   cout << endl;
-  // }
-  // cout << "\nOriginal 32\n";
-  // for (i = 36; i < 68; i++) {
-  //   cout << (i - 35) << ": ";
-  //   const FmAlgorithm &alg = algorithms[i];
-  //   for (j = 0; j < 6; j++) {
-  //     int flags = alg.ops[j];
-  //     cout << " ";
-  //     if (flags & FB_IN) cout << "[";
-  //     cout << (flags & IN_BUS_ONE ? "1" : flags & IN_BUS_TWO ? "2" : "0") << "->";
-  //     cout << (flags & OUT_BUS_ONE ? "1" : flags & OUT_BUS_TWO ? "2" : "0");
-  //     if (flags & OUT_BUS_ADD) cout << "+";
-  //     //cout << alg.ops[j].in << "->" << alg.ops[j].out;
-  //     if (flags & FB_OUT) cout << "]";
-  //   }
-  //   cout << " " << n_out(alg);
-  //   cout << endl;
-  // }
+
   Serial.println(buffer.str().c_str());
 #undef cout
 #undef endl
@@ -268,7 +218,7 @@ void FmCore::render(int32_t *output, FmOpParams *params, int algorithm, int32_t 
           // cout << op << " fb " << inbus << outbus << add << endl;
           FmOpKernel::compute_fb(outptr, param.phase, param.freq,
                                  gain1, gain2,
-                                 fb_buf, feedback_shift, add);
+                                 fb_buf, feedback_shift, has_contents[inbus]);
           outptr = (outbus == 0) ? output : buf_[outbus - 1].get();                                 
         }
         // cout << op << " normal " << inbus << outbus << " " << param.freq << add << endl;

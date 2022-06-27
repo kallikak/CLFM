@@ -83,7 +83,7 @@ class Dexed
     bool isIdle();
     bool isReleasing();
 
-    ProcessorVoice voices[4];
+    ProcessorVoice voices[_MAX_NOTES];
 
   protected:
     uint8_t max_notes;

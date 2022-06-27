@@ -35,7 +35,7 @@
 #define TRANSPOSE_FIX 24
 #define VOICE_SILENCE_LEVEL 1100
 
-#define _MAX_NOTES 32
+#define _MAX_NOTES 16
 
 //#define USE_SIMPLE_COMPRESSOR 1
 

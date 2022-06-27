@@ -15,6 +15,7 @@ MIDIDevice midi1(myusb);
 #endif
 
 bool midimode = false;
+#define POLYPHONY 16
 
 bool updateall = false;
 int loopcount = 0;
@@ -47,7 +48,7 @@ bool resetpressed = false;
 
 volatile bool feedback2 = false;
 
-AudioSynthDexed         fm(midimode ? 4 : 1, SAMPLE_RATE);
+AudioSynthDexed         fm(midimode ? POLYPHONY : 1, SAMPLE_RATE);
 AudioFilterStateVariable filter;
 AudioAmplifier          amp;
 AudioOutputI2S2         i2s2;
@@ -699,7 +700,7 @@ void setup()
   resetsw->attach(RESET);
   resetsw->interval(50);
   
-  AudioMemory(50);
+  AudioMemory(20);
   
   attachInterrupt(GATE_IN, handle_gate, CHANGE);
   
@@ -1050,7 +1051,7 @@ ResetState resetState = NONE;
 
 void handleResetButton()
 {
-  if (loopcount < 1000)
+  if (loopcount < 10)
     return; // avoid initial transients
   resetsw->update();
   if (resetsw->read() == LOW)
@@ -1111,7 +1112,7 @@ void setMidiMode(bool set)
   if (set)
   {
     Serial.println("turning on midi mode");
-    fm.setMaxNotes(4);
+    fm.setMaxNotes(POLYPHONY);
     midimode = true;
     note = -1;
   }
@@ -1142,7 +1143,6 @@ void handleNoteOff(byte channel, byte note, byte velocity) {
 
 void handlePitchChange(byte channel, int pitch) {
   pitch = map(pitch, -8192, 8192, -7 * PITCH_BEND_FACTOR, 7 * PITCH_BEND_FACTOR);
-  Serial.println(pitch);
   config.detune = pitch;
   fm.doRefreshVoice();
 }

@@ -51,6 +51,9 @@ Dexed::Dexed(uint8_t maxnotes, int rate)
   vuSignal = 0.0;
   // voices=NULL;
 
+  for (int i = 0; i < _MAX_NOTES; i++)
+    voices[i].dx7_note = NULL;
+
   setMaxNotes(max_notes);
   // loadInitVoice();
 

@@ -16,6 +16,7 @@ MIDIDevice midi1(myusb);
 
 bool midimode = false;
 
+bool updateall = false;
 int loopcount = 0;
 
 extern "C" uint32_t set_arm_clock(uint32_t frequency);
@@ -171,12 +172,13 @@ void printConfig()
   }
   Serial.printf("Levels: %6d %6d %6d %6d\n", config.level[3], config.level[2], config.level[1], config.level[0]);
   Serial.printf("Feedback: %4d on operator %d\n", config.feedback, feedback2 ? 2 : 4);
+  Serial.printf("Oscillator sync is %s\n", config.sync ? "on" : "off");
 }
 
 bool potchange(potval *v, unsigned long now, bool centre, bool jittery)
 {
   bool force = false;
-  if (loopcount < 2)
+  if (updateall)
     return true;  // initial update
   // extra accepting near limits
 #define LIMIT 1
@@ -253,8 +255,18 @@ void setAmpGain()
 //  2 => 0.5
 //  3 => 0.4
 //  4 => 0.3
-  float gain = 0.7 - fm.getCarrierCount() * 0.1;
-//  amp.gain(midimode ? gain / 4 : gain);
+
+//  1 => 0.4
+//  2 => 0.36
+//  3 => 0.33
+//  4 => 0.3
+  float gain;
+  if (midimode)
+    gain = 0.3;
+//    gain = 0.433 - fm.getCarrierCount() * 0.033;
+  else
+    gain = 0.7 - fm.getCarrierCount() * 0.1;
+//  amp.gain(midimode ? gain / 2 : gain);
   amp.gain(gain);
 }
 
@@ -628,6 +640,13 @@ void checkSerialControl()
         Serial.println("°C");
         Serial.println("---------------------");
         break;
+      case 's':
+        config.sync = !config.sync;
+        Serial.println("=====================");
+        Serial.print("Sync is now ");
+        Serial.println(config.sync ? "on" : "off");
+        Serial.println("---------------------");
+        break;
       case 'h':
         Serial.println("==========================================");
         Serial.println("         Serial Comands");
@@ -635,6 +654,7 @@ void checkSerialControl()
         Serial.println("    c - print the current configuration");
         Serial.println("    z - toggle print configuration on change");
         Serial.println("    p - panic (all notes off)");
+        Serial.println("    s - toggle oscillator sync");
         Serial.println("    t - show the temperature of the Teensy");
         Serial.println("    h - show the help (this message)");
         Serial.println("------------------------------------------");
@@ -707,6 +727,7 @@ void setup()
   config.algorithm = -1; // invalid ensures initial update
   controls.envMode = (envCtrlMode)-1; // invalid ensures initial update
   config.detune = 0;
+  config.sync = true;
 
 #if CLFM_VERSION == RELEASE_1
   myusb.begin();
@@ -729,6 +750,7 @@ void setup()
   delay(300); 
 
   idle = false;
+  updateall = true;
 }
 
 void loop() 
@@ -821,7 +843,9 @@ void loop()
     {
       long v = (uint8_t)(sqrt(controls.levelpot[i].value / 127.0) * 99);
 //      config.level[i] = midimode && getOpType(i, config.algorithm) == CARRIER ? 0.75 * v : v;
-      config.level[i] = midimode ? 0.75 * v : v;
+//      config.level[i] = midimode ? 0.75 * v : v;
+      config.level[i] = midimode ? 0.9 * v : v;
+//      config.level[i] = v;
 //      Serial.printf("Level: %d %3d %2d\n", i + 1, config.levelpot[i].value, v);
       needsUpdate = true;
     }
@@ -835,6 +859,8 @@ void loop()
       needsUpdate = true;
     }
   }
+
+  updateall = false;
 
   if (updateEnv)
     fm.doRefreshEnv();
@@ -1081,6 +1107,7 @@ void handleResetLEDs()
 void setMidiMode(bool set)
 {
   fm.panic();
+  updateall = true;
   if (set)
   {
     Serial.println("turning on midi mode");

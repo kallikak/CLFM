@@ -28,6 +28,7 @@ typedef struct configStruct
   coarseAdj coarse[4];
   int fine[4];
   int detune;
+  bool sync;
   envvals env[4];
   int level[4];
   int feedback;

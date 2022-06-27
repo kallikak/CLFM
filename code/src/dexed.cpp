@@ -314,6 +314,8 @@ void Dexed::keydown(int16_t pitch, uint8_t velo) {
       voices[note].velocity = velo;
       voices[note].keydown = true;
       voices[note].dx7_note->init(algorithm, pitch, velo);
+      if (config.sync)
+        voices[note].dx7_note->oscSync();
       voices[i].key_pressed_timer = millis();
       keydown_counter++;
       break;

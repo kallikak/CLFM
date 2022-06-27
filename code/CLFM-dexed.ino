@@ -737,6 +737,9 @@ void setup()
   midi1.setHandleNoteOff(handleNoteOff);
   midi1.setHandlePitchChange(handlePitchChange);
 #endif
+  usbMIDI.setHandleNoteOn(handleNoteOn);
+  usbMIDI.setHandleNoteOff(handleNoteOff);
+  usbMIDI.setHandlePitchChange(handlePitchChange);
   
   Serial.println("Setup complete");
 
@@ -873,11 +876,15 @@ void loop()
       printConfig();
   }
   
+  if (midimode)
+  {
 #if CLFM_VERSION == RELEASE_1
-  myusb.Task();
-  midi1.read();
+    myusb.Task();
+    midi1.read();
 #endif  
-  if (!midimode)
+    usbMIDI.read();
+  }
+  else
   {
   // TODO move the pitch cv handling to a method
     bool releasing = fm.isReleasing();

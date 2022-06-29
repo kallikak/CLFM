@@ -61,8 +61,6 @@ const int32_t coarsemul[] = {
   81503396, 82323963, 83117622
 };
 
-#define CALIBRATION 0
-
 // ScaleLevel: break_pt = 33, left_depth = 0, right_depth = 0, left_curve = 0, right_curve = 0
 // ScaleCurve: group = 17, depth = 0, curve = 0
 // ScaleVelocity: velocity = 0, sensitivity = 0
@@ -92,8 +90,6 @@ int32_t osc_freq(float midinote, int mode, int coarse, int fine, int detune) {
     }
 
     logfreq += coarsemul[coarse & 31];
-    // calibration step
-    fine += CALIBRATION;
     if (fine) {
       // (1 << 24) / log(2)
       //logfreq += (int32_t)floor(24204406.323123 * log(1 + 0.01 * fine) + 0.5);
@@ -182,7 +178,7 @@ void Dx7Note::init(uint8_t algorithm, float midinote, int velocity) {
     int d = config.env[op].d;
     int s = config.env[op].s;
     int r = config.env[op].r;
-    int outlevel = config.level[op];
+    int outlevel = config.level[op] * config.scale[op];
     outlevel = FEnv::scaleoutlevel(outlevel);
     int level_scaling = ScaleLevel(midinote, BREAK_PT, DEF_DEPTH, DEF_DEPTH, DEF_DEPTH, DEF_DEPTH);
     outlevel += level_scaling;
@@ -288,7 +284,7 @@ void Dx7Note::updateEnv(float midinote, int velocity)
     int d = config.env[op].d;
     int s = config.env[op].s;
     int r = config.env[op].r;
-    int outlevel = config.level[op];
+    int outlevel = config.level[op] * config.scale[op];
     outlevel = FEnv::scaleoutlevel(outlevel);
     int level_scaling = ScaleLevel(midinote, BREAK_PT, DEF_DEPTH, DEF_DEPTH, DEF_DEPTH, DEF_DEPTH);
     outlevel += level_scaling;
@@ -319,7 +315,7 @@ void Dx7Note::update(uint8_t algorithm, float midinote, int velocity, bool refre
     int d = config.env[op].d;
     int s = config.env[op].s;
     int r = config.env[op].r;
-    int outlevel = config.level[op];
+    int outlevel = config.level[op] * config.scale[op];
     int mode = 0;
     int coarse = (int)(config.coarse[op]);
     int fine = config.fine[op];

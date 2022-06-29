@@ -152,6 +152,7 @@ typedef struct controlsStruct
   potval envpot[4];
   potval feedbackpot;
   envCtrlMode envMode;
+  byte modvalue;
 } controlsStruct;
 
 configStruct config;
@@ -727,6 +728,8 @@ void setup()
   
   config.algorithm = -1; // invalid ensures initial update
   controls.envMode = (envCtrlMode)-1; // invalid ensures initial update
+  controls.modvalue = 0;
+  scaleModulators(0);
   config.detune = 0;
   config.sync = true;
 
@@ -736,10 +739,14 @@ void setup()
   midi1.setHandleNoteOn(handleNoteOn);
   midi1.setHandleNoteOff(handleNoteOff);
   midi1.setHandlePitchChange(handlePitchChange);
+  midi1.setHandleControlChange(handleControlChange);
+  midi1.setHandleAfterTouchChannel(handleAfterTouchChannel);
 #endif
   usbMIDI.setHandleNoteOn(handleNoteOn);
   usbMIDI.setHandleNoteOff(handleNoteOff);
   usbMIDI.setHandlePitchChange(handlePitchChange);
+  usbMIDI.setHandleControlChange(handleControlChange);
+  usbMIDI.setHandleAfterTouchChannel(handleAfterTouchChannel);
   
   Serial.println("Setup complete");
 
@@ -1111,6 +1118,7 @@ void handleResetLEDs()
   digitalWrite(levelLEDs[3], resetState == PANIC);
   digitalWrite(levelLEDs[0], LOW);
 }
+#endif
 
 void setMidiMode(bool set)
 {
@@ -1122,12 +1130,14 @@ void setMidiMode(bool set)
     fm.setMaxNotes(POLYPHONY);
     midimode = true;
     note = -1;
+    scaleModulators(controls.modvalue);
   }
   else
   {
     Serial.println("turning off midi mode");
     fm.setMaxNotes(1);
     midimode = false;
+    scaleModulators(0);
   }
 }
 
@@ -1153,4 +1163,24 @@ void handlePitchChange(byte channel, int pitch) {
   config.detune = pitch;
   fm.doRefreshVoice();
 }
-#endif
+
+void scaleModulators(byte amount)
+{
+  float f = (1 + amount / 127.0 / 2); // up to 50% increase
+  for (int i = 0; i < 4; ++i)
+  {
+    if (getOpType(0, config.algorithm) == MODULATOR)
+      config.scale[i] = f;
+    else
+      config.scale[i] = 1;
+  }
+}
+
+void handleAfterTouchChannel(byte channel, byte pressure) {
+  scaleModulators(pressure);
+}
+
+void handleControlChange(byte channel, byte control, byte value) {
+  if (control == 1) // mod wheel
+    scaleModulators(value);
+}

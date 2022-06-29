@@ -31,6 +31,7 @@ typedef struct configStruct
   bool sync;
   envvals env[4];
   int level[4];
+  float scale[4];
   int feedback;
 } configStruct;
 

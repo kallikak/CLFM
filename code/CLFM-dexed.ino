@@ -1166,21 +1166,27 @@ void handlePitchChange(byte channel, int pitch) {
 
 void scaleModulators(byte amount)
 {
-  float f = (1 + amount / 127.0 / 2); // up to 50% increase
   for (int i = 0; i < 4; ++i)
   {
-    if (getOpType(0, config.algorithm) == MODULATOR)
-      config.scale[i] = f;
+    float l = sqrt(config.level[i] / 100.0);
+    float f = max(min((1 - l) + 0.1, 1), 0.1);
+    if (getOpType(i, config.algorithm) == MODULATOR)
+      config.scale[i] = 1 + f * (amount / 127.0);
     else
       config.scale[i] = 1;
+//    Serial.printf("%.2f => %.2f [%.2f]\t", l, config.scale[i], f);
   }
+  Serial.println();
 }
 
 void handleAfterTouchChannel(byte channel, byte pressure) {
-  scaleModulators(pressure);
+  scaleModulators(controls.modvalue + pressure);
 }
 
 void handleControlChange(byte channel, byte control, byte value) {
   if (control == 1) // mod wheel
+  {
+    controls.modvalue = value;
     scaleModulators(value);
+  }
 }

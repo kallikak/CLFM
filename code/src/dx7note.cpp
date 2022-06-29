@@ -178,7 +178,7 @@ void Dx7Note::init(uint8_t algorithm, float midinote, int velocity) {
     int d = config.env[op].d;
     int s = config.env[op].s;
     int r = config.env[op].r;
-    int outlevel = config.level[op] * config.scale[op];
+    int outlevel = min(100, config.level[op] * config.scale[op]);
     outlevel = FEnv::scaleoutlevel(outlevel);
     int level_scaling = ScaleLevel(midinote, BREAK_PT, DEF_DEPTH, DEF_DEPTH, DEF_DEPTH, DEF_DEPTH);
     outlevel += level_scaling;
@@ -284,7 +284,7 @@ void Dx7Note::updateEnv(float midinote, int velocity)
     int d = config.env[op].d;
     int s = config.env[op].s;
     int r = config.env[op].r;
-    int outlevel = config.level[op] * config.scale[op];
+    int outlevel = min(100, config.level[op] * config.scale[op]);
     outlevel = FEnv::scaleoutlevel(outlevel);
     int level_scaling = ScaleLevel(midinote, BREAK_PT, DEF_DEPTH, DEF_DEPTH, DEF_DEPTH, DEF_DEPTH);
     outlevel += level_scaling;
@@ -315,7 +315,7 @@ void Dx7Note::update(uint8_t algorithm, float midinote, int velocity, bool refre
     int d = config.env[op].d;
     int s = config.env[op].s;
     int r = config.env[op].r;
-    int outlevel = config.level[op] * config.scale[op];
+    int outlevel = min(100, config.level[op] * config.scale[op]);
     int mode = 0;
     int coarse = (int)(config.coarse[op]);
     int fine = config.fine[op];

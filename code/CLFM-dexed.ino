@@ -731,7 +731,7 @@ void setup()
   controls.modvalue = 0;
   scaleModulators(0);
   config.detune = 0;
-  config.sync = true;
+  config.sync = false;
 
 #if CLFM_VERSION == RELEASE_1
   myusb.begin();
@@ -883,15 +883,12 @@ void loop()
       printConfig();
   }
   
-  if (midimode)
-  {
 #if CLFM_VERSION == RELEASE_1
     myusb.Task();
     midi1.read();
 #endif  
     usbMIDI.read();
-  }
-  else
+  if (!midimode)
   {
   // TODO move the pitch cv handling to a method
     bool releasing = fm.isReleasing();
@@ -1059,7 +1056,7 @@ void handleResetLEDs()
   digitalWrite(levelLEDs[3], resetState == FREE);
 }
 #else
-typedef enum { NONE, PANIC, MIDI, CV } ResetState;
+typedef enum { NONE, PANIC, MIDI, CV, SYNC } ResetState;
 
 ResetState resetState = NONE;
 
@@ -1071,9 +1068,13 @@ void handleResetButton()
   if (resetsw->read() == LOW)
   {
     long cd = resetsw->duration();
-    if (cd > 3000)
+    if (cd > 4000)
     {
       pin_reset();
+    }
+    else if (cd > 3000)
+    {
+      if (resetState != SYNC) resetState = SYNC;
     }
     else if (cd > 2000)
     {
@@ -1103,6 +1104,10 @@ void handleResetButton()
       case MIDI:
         setMidiMode(false);
         break;
+      case SYNC:
+        config.sync = !config.sync;
+        Serial.printf("Oscillator sync is %s\n", config.sync ? "on" : "off");
+        break;
       case NONE:
         break;
     }
@@ -1113,17 +1118,15 @@ void handleResetButton()
 
 void handleResetLEDs()
 {
-  digitalWrite(levelLEDs[1], resetState == CV);
-  digitalWrite(levelLEDs[2], resetState == MIDI);
   digitalWrite(levelLEDs[3], resetState == PANIC);
-  digitalWrite(levelLEDs[0], LOW);
+  digitalWrite(levelLEDs[2], resetState == MIDI);
+  digitalWrite(levelLEDs[1], resetState == CV);
+  digitalWrite(levelLEDs[0], resetState == SYNC);
 }
 #endif
 
 void setMidiMode(bool set)
 {
-  fm.panic();
-  updateall = true;
   if (set)
   {
     Serial.println("turning on midi mode");
@@ -1139,9 +1142,11 @@ void setMidiMode(bool set)
     midimode = false;
     scaleModulators(0);
   }
+  updateall = true;
 }
 
-void handleNoteOn(byte channel, byte note, byte velocity) {
+void handleNoteOn(byte channel, byte note, byte velocity) 
+{
   if (midimode)
   {
     if (idle)
@@ -1153,37 +1158,49 @@ void handleNoteOn(byte channel, byte note, byte velocity) {
   }
 }
 
-void handleNoteOff(byte channel, byte note, byte velocity) {
+void handleNoteOff(byte channel, byte note, byte velocity) 
+{
   if (midimode)
     fm.keyup((int16_t)note + MIDI_NOTE_OFFSET);
 }
 
-void handlePitchChange(byte channel, int pitch) {
-  pitch = map(pitch, -8192, 8192, -7 * PITCH_BEND_FACTOR, 7 * PITCH_BEND_FACTOR);
-  config.detune = pitch;
-  fm.doRefreshVoice();
+void handlePitchChange(byte channel, int pitch) 
+{
+  if (midimode)
+  {
+    pitch = map(pitch, -8192, 8192, -7 * PITCH_BEND_FACTOR, 7 * PITCH_BEND_FACTOR);
+    config.detune = pitch;
+    fm.doRefreshVoice();
+  }
 }
 
 void scaleModulators(byte amount)
 {
   for (int i = 0; i < 4; ++i)
   {
-    float l = sqrt(config.level[i] / 100.0);
-    float f = max(min((1 - l) + 0.1, 1), 0.1);
     if (getOpType(i, config.algorithm) == MODULATOR)
+    {
+      float l = sqrt(config.level[i] / 100.0);
+      float f = max(min((1 - l) + 0.1, 1), 0.1);
       config.scale[i] = 1 + f * (amount / 127.0);
+      int current = config.level[i];
+      int target = current * config.scale[i];
+//      Serial.printf("%d => %.2f [%d => %d]\t", amount, config.scale[i], current, target);
+    }
     else
       config.scale[i] = 1;
-//    Serial.printf("%.2f => %.2f [%.2f]\t", l, config.scale[i], f);
   }
   Serial.println();
+  fm.doRefreshEnv();
 }
 
-void handleAfterTouchChannel(byte channel, byte pressure) {
+void handleAfterTouchChannel(byte channel, byte pressure) 
+{
   scaleModulators(controls.modvalue + pressure);
 }
 
-void handleControlChange(byte channel, byte control, byte value) {
+void handleControlChange(byte channel, byte control, byte value) 
+{
   if (control == 1) // mod wheel
   {
     controls.modvalue = value;

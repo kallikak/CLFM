@@ -33,24 +33,16 @@ class FmOpKernel {
     // This is the basic FM operator. No feedback.
     static void compute(int32_t *output, const int32_t *input,
                         int32_t phase0, int32_t freq, wavetype wave,
-                        int32_t gain1, int32_t gain2, bool add);
+                        int16_t fold, int32_t gain1, int32_t gain2, bool add);
 
     // This is a sine generator, no feedback.
     static void compute_pure(int32_t *output, int32_t phase0, int32_t freq, wavetype wave,
-                             int32_t gain1, int32_t gain2, bool add);
+                             int16_t fold, int32_t gain1, int32_t gain2, bool add);
 
     // One op with feedback, no add.
     static void compute_fb(int32_t *output, int32_t phase0, int32_t freq, wavetype,
-                           int32_t gain1, int32_t gain2, 
+                           int16_t fold, int32_t gain1, int32_t gain2, 
                            int32_t *fb_buf, int fb_gain, bool add);
-
-    // This is a foldable sine generator
-    static void compute_sinefold(int32_t *output, int32_t phase0, int32_t freq,
-                             int16_t fold, int32_t gain1, int32_t gain2, bool add);
-
-    // This is a foldable triangle generator
-    static void compute_trifold(int32_t *output, int32_t phase0, int32_t freq,
-                             int16_t fold, int32_t gain1, int32_t gain2, bool add);
 };
 
 #endif

@@ -580,11 +580,19 @@ void updateWavetypes()
         config.wave[0] = config.wave[1] = config.wave[3] = SQR;
         config.wave[2] = TRI;
         break;
+#if CLFM_VERSION == RELEASE_1
       case 6:
+#else      
+      case 5:
+#endif      
         config.wave[1] = SQR;
         config.wave[3] = TRI;
         break;
+#if CLFM_VERSION == RELEASE_1
       case 9:
+#else      
+      case 7:
+#endif
         config.fold = true;
         config.wave[0] = config.wave[1] = TRIFOLD;
         config.wave[2] = config.wave[3] = SINFOLD;
@@ -1020,8 +1028,9 @@ void loop()
   
   if (!idle && loopcount % 100 == 0) {
     idle = fm.isIdle();
-    if (idle)
+    if (idle) {
       set_arm_clock(24000000);  
+    }
   }
 
   checkSerialControl();
@@ -1092,10 +1101,10 @@ void handleResetButton()
 
 void handleResetLEDs()
 {
-  digitalWrite(levelLEDs[0], resetState == OP4FB);
-  digitalWrite(levelLEDs[1], resetState == OP2FB);
-  digitalWrite(levelLEDs[2], resetState == QUANTISE);
-  digitalWrite(levelLEDs[3], resetState == FREE);
+  digitalWrite(levelLEDs[3], resetState == OP4FB);
+  digitalWrite(levelLEDs[2], resetState == OP2FB);
+  digitalWrite(levelLEDs[1], resetState == QUANTISE);
+  digitalWrite(levelLEDs[0], resetState == FREE);
 }
 #else
 typedef enum { NONE, PANIC, MIDI, CV, AFTERTOUCH } ResetState;

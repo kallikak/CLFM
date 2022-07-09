@@ -203,31 +203,23 @@ void FmCore::render(int32_t *output, FmOpParams *params, int algorithm, int32_t 
       if (!has_contents[outbus]) {
         add = false;
       }
-      if (wave == SINFOLD) {
-        FmOpKernel::compute_sinefold(outptr, param.phase, param.freq,
-                                     param.fold, gain1, gain2, add);
-      }
-      else if (wave == TRIFOLD) {
-        FmOpKernel::compute_trifold(outptr, param.phase, param.freq,
-                                    param.fold, gain1, gain2, add);
-      }
-      else if (inbus == 0 || !has_contents[inbus]) {
+      if (inbus == 0 || !has_contents[inbus]) {
         // todo: more than one op in a feedback loop
         if ((flags & 0xc0) == 0xc0 && feedback_shift < 16) {
           // cout << op << " fb " << inbus << outbus << add << endl;
           FmOpKernel::compute_fb(outptr, param.phase, param.freq, 
-                                 wave, gain1, gain2,
+                                 wave, param.fold, gain1, gain2,
                                  fb_buf, feedback_shift, add);
         } else {
           // cout << op << " pure " << inbus << outbus << add << endl;
           FmOpKernel::compute_pure(outptr, param.phase, param.freq, wave,
-                                   gain1, gain2, add);
+                                   param.fold, gain1, gain2, add);
         }
       } else {
         if ((flags & 0xc0) == 0xc0 && feedback_shift < 16) {
           // cout << op << " fb " << inbus << outbus << add << endl;
           FmOpKernel::compute_fb(outptr, param.phase, param.freq, 
-                                 wave, gain1, gain2,
+                                 wave, param.fold, gain1, gain2,
                                  fb_buf, feedback_shift, has_contents[inbus]);
           outptr = (outbus == 0) ? output : buf_[outbus - 1].get();                                 
         }
@@ -235,7 +227,7 @@ void FmCore::render(int32_t *output, FmOpParams *params, int algorithm, int32_t 
         // cout << op << " normal " << inbus << outbus << " " << param.freq << add << endl;
         FmOpKernel::compute(outptr, buf_[inbus - 1].get(),
                             param.phase, param.freq, wave,
-                            gain1, gain2, add);
+                            param.fold, gain1, gain2, add);
       }
       has_contents[outbus] = true;
     } else if (!add) {

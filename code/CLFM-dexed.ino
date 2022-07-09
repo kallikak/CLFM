@@ -41,6 +41,7 @@ Bounce *resetsw = new Bounce();
 
 bool idle = true;
 bool quantise = true;
+bool aftertouch = false;
 
 #define PITCH_BEND_FACTOR 7
 
@@ -160,11 +161,14 @@ controlsStruct controls;
 
 bool showConfigOnChange = false;
 
+const char *wavestr[] = {"sin", "tri", "sqr", "sinfld", "trifld"};
 void printConfig()
 {
   Serial.printf("Algorithm: %3d\n", config.algorithm + 1);
   Serial.printf("Coarse: %6s %6s %6s %6s\n", coarseFactors[config.coarse[3]], coarseFactors[config.coarse[2]], coarseFactors[config.coarse[1]], coarseFactors[config.coarse[0]]);  
   Serial.printf("Fine:   %6d %6d %6d %6d\n", config.fine[3], config.fine[2], config.fine[1], config.fine[0]);
+  Serial.printf("Wave:   %6s %6s %6s %6s\n", 
+    wavestr[config.wave[3]], wavestr[config.wave[2]], wavestr[config.wave[1]], wavestr[config.wave[0]]);
   for (int k = 3; k >= 0; --k)
   {
     if (config.env[k].drone)
@@ -559,6 +563,36 @@ bool checkEnvMode()
   return false;
 }
 
+void updateWavetypes()
+{
+  // set default and change where necessary
+  config.fold = false;
+  config.wave[0] = config.wave[1] = config.wave[2] = config.wave[3] = SIN;
+  if (feedback2) 
+  {
+    switch (config.algorithm)
+    {
+      case 3:
+        config.wave[0] = TRI;
+        config.wave[1] = SQR;
+        break;
+      case 4:
+        config.wave[0] = config.wave[1] = config.wave[3] = SQR;
+        config.wave[2] = TRI;
+        break;
+      case 6:
+        config.wave[1] = SQR;
+        config.wave[3] = TRI;
+        break;
+      case 9:
+        config.fold = true;
+        config.wave[0] = config.wave[1] = TRIFOLD;
+        config.wave[2] = config.wave[3] = SINFOLD;
+        break;
+    }
+  }
+}
+
 void pin_reset() 
 {
 //  setMidiMode(!midimode);
@@ -606,10 +640,17 @@ void checkSerialControl()
     char c = Serial.read();
     switch (c)
     {
+      case 'x':
+        config.wave[3] = SQR;
+        config.wave[1] = TRI;
+        Serial.println("------------------------------------------");
+        printConfig();
+        Serial.println("------------------------------------------");
+        break;
       case 'q':
         quantise = !quantise;
         Serial.println("==========================================");
-        Serial.println(quantise ? "Quantize on" : "Quantize off");
+        Serial.println(quantise ? "Quantise on" : "Quantise off");
         Serial.println("------------------------------------------");
         break;
       case 'c':
@@ -824,6 +865,7 @@ void loop()
     setAmpGain();
     needsUpdate = true;
     updateAllEnv(controls.envMode, config.algorithm);
+    updateWavetypes();
   }
 
   for (i = 0; i < 4; ++i)
@@ -1056,7 +1098,7 @@ void handleResetLEDs()
   digitalWrite(levelLEDs[3], resetState == FREE);
 }
 #else
-typedef enum { NONE, PANIC, MIDI, CV, SYNC } ResetState;
+typedef enum { NONE, PANIC, MIDI, CV, AFTERTOUCH } ResetState;
 
 ResetState resetState = NONE;
 
@@ -1074,7 +1116,7 @@ void handleResetButton()
     }
     else if (cd > 3000)
     {
-      if (resetState != SYNC) resetState = SYNC;
+      if (resetState != AFTERTOUCH) resetState = AFTERTOUCH;
     }
     else if (cd > 2000)
     {
@@ -1104,9 +1146,9 @@ void handleResetButton()
       case MIDI:
         setMidiMode(false);
         break;
-      case SYNC:
-        config.sync = !config.sync;
-        Serial.printf("Oscillator sync is %s\n", config.sync ? "on" : "off");
+      case AFTERTOUCH:
+        aftertouch = !aftertouch;
+        Serial.printf("Aftertouch is %s\n", aftertouch ? "on" : "off");
         break;
       case NONE:
         break;
@@ -1121,7 +1163,7 @@ void handleResetLEDs()
   digitalWrite(levelLEDs[3], resetState == PANIC);
   digitalWrite(levelLEDs[2], resetState == MIDI);
   digitalWrite(levelLEDs[1], resetState == CV);
-  digitalWrite(levelLEDs[0], resetState == SYNC);
+  digitalWrite(levelLEDs[0], resetState == AFTERTOUCH);
 }
 #endif
 
@@ -1183,8 +1225,8 @@ void scaleModulators(byte amount)
       float l = sqrt(config.level[i] / 100.0);
       float f = max(min((1 - l) + 0.1, 1), 0.1);
       config.scale[i] = 1 + f * (amount / 127.0);
-      int current = config.level[i];
-      int target = current * config.scale[i];
+//      int current = config.level[i];
+//      int target = current * config.scale[i];
 //      Serial.printf("%d => %.2f [%d => %d]\t", amount, config.scale[i], current, target);
     }
     else
@@ -1196,7 +1238,8 @@ void scaleModulators(byte amount)
 
 void handleAfterTouchChannel(byte channel, byte pressure) 
 {
-  scaleModulators(controls.modvalue + pressure);
+  if (aftertouch)
+    scaleModulators(controls.modvalue + pressure);
 }
 
 void handleControlChange(byte channel, byte control, byte value) 

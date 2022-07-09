@@ -12,8 +12,9 @@
 #define N_ALGS 10
 #endif
 
+typedef enum {SIN, TRI, SQR, SINFOLD, TRIFOLD} wavetype;
+
 typedef enum { DIV_128, DIV_64, DIV_32, DIV_16, DIV_8, DIV_4, DIV_2, UNITY, MUL_2, MUL_3, MUL_4, MUL_5, MUL_6, MUL_7, MUL_8 } coarseAdj;
-extern const char *coarseFactors[];
 
 typedef struct
 {
@@ -29,6 +30,8 @@ typedef struct configStruct
   int fine[4];
   int detune;
   bool sync;
+  bool fold;
+  wavetype wave[4];
   envvals env[4];
   int level[4];
   float scale[4];

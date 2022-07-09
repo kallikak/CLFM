@@ -60,3 +60,49 @@ int32_t Sin::lookup(int32_t phase) {
 #endif
 }
 #endif
+
+class Tri {
+  public:
+    Tri();
+
+    static void init();
+    static int32_t lookup(int32_t phase);
+};
+
+extern int32_t tritab[SIN_N_SAMPLES + 1];
+
+#ifdef SIN_INLINE
+inline
+int32_t Tri::lookup(int32_t phase) {
+  const int SHIFT = 24 - SIN_LG_N_SAMPLES;
+  int lowbits = phase & ((1 << SHIFT) - 1);
+  int phase_int = (phase >> SHIFT) & (SIN_N_SAMPLES - 1);
+  int y0 = tritab[phase_int];
+  int y1 = tritab[phase_int + 1];
+
+  return y0 + (((int64_t)(y1 - y0) * (int64_t)lowbits) >> SHIFT);
+}
+#endif
+
+class Sqr {
+  public:
+    Sqr();
+
+    static void init();
+    static int32_t lookup(int32_t phase);
+};
+
+extern int32_t sqrtab[SIN_N_SAMPLES + 1];
+
+#ifdef SIN_INLINE
+inline
+int32_t Sqr::lookup(int32_t phase) {
+  const int SHIFT = 24 - SIN_LG_N_SAMPLES;
+  int lowbits = phase & ((1 << SHIFT) - 1);
+  int phase_int = (phase >> SHIFT) & (SIN_N_SAMPLES - 1);
+  int y0 = sqrtab[phase_int];
+  int y1 = sqrtab[phase_int + 1];
+
+  return y0 + (((int64_t)(y1 - y0) * (int64_t)lowbits) >> SHIFT);
+}
+#endif

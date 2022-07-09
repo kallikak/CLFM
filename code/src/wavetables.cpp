@@ -16,9 +16,10 @@
 
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <Arduino.h>
 
 #include "synth.h"
-#include "sin.h"
+#include "wavetables.h"
 
 #define R (1 << 29)
 
@@ -77,7 +78,6 @@ int32_t Sin::lookup(int32_t phase) {
 #endif
 }
 #endif
-
 
 #if 0
 // The following is an implementation designed not to use any lookup tables,
@@ -142,3 +142,59 @@ int32_t Sin::compute10(int32_t phase) {
   y ^= -((phase >> 29) & 1);
   return y;
 }
+
+int32_t tritab[SIN_N_SAMPLES + 1];
+
+void Tri::init() {
+  float v = -1;
+  float dv = 4.0 / SIN_N_SAMPLES;
+  for (int i = 0; i <= SIN_N_SAMPLES / 2; i++) {
+    tritab[i] = (int32_t)(v * (1 << 24));
+    tritab[SIN_N_SAMPLES - i] = tritab[i];
+    v += dv;
+  }
+}
+
+#ifndef SIN_INLINE
+int32_t Tri::lookup(int32_t phase) {
+  const int SHIFT = 24 - SIN_LG_N_SAMPLES;
+  int lowbits = phase & ((1 << SHIFT) - 1);
+  int phase_int = (phase >> SHIFT) & (SIN_N_SAMPLES - 1);
+  int y0 = tritab[phase_int];
+  int y1 = tritab[phase_int + 1];
+
+  return y0 + (((int64_t)(y1 - y0) * (int64_t)lowbits) >> SHIFT);
+}
+#endif
+
+
+int32_t sqrtab[SIN_N_SAMPLES + 1];
+
+void Sqr::init() {
+  const int ramp = 20;  // reduce aliasing
+  for (int i = 0; i <= SIN_N_SAMPLES / 2; i++) {
+    if (i < ramp) {
+      float v = 1.0 * i / ramp;
+      sqrtab[i] = (int32_t)(v * (1 << 24));
+    }
+    else if (i > SIN_N_SAMPLES / 2 - ramp) {
+      float v = 1.0 * (SIN_N_SAMPLES / 2 - i) / ramp;
+      sqrtab[i] = (int32_t)(v * (1 << 24));
+    }
+    else
+      sqrtab[i] = (int32_t)(1 << 24);
+    sqrtab[SIN_N_SAMPLES - i] = -sqrtab[i];
+  }
+}
+
+#ifndef SIN_INLINE
+int32_t Sqr::lookup(int32_t phase) {
+  const int SHIFT = 24 - SIN_LG_N_SAMPLES;
+  int lowbits = phase & ((1 << SHIFT) - 1);
+  int phase_int = (phase >> SHIFT) & (SIN_N_SAMPLES - 1);
+  int y0 = sqrtab[phase_int];
+  int y1 = sqrtab[phase_int + 1];
+
+  return y0 + (((int64_t)(y1 - y0) * (int64_t)lowbits) >> SHIFT);
+}
+#endif

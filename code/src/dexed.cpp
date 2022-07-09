@@ -24,11 +24,12 @@
 */
 #include "Arduino.h"
 
+#include "../CLFM.h"
 #include "synth.h"
 #include "dexed.h"
 #include "fm_core.h"
 #include "exp2.h"
-#include "sin.h"
+#include "wavetables.h"
 #include "freqlut.h"
 #include <unistd.h>
 #include <limits.h>
@@ -41,6 +42,8 @@ Dexed::Dexed(uint8_t maxnotes, int rate)
   Exp2::init();
   Tanh::init();
   Sin::init();
+  Tri::init();
+  Sqr::init();
 
   Freqlut::init(rate);
   FEnv::init_sr(rate);

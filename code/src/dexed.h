@@ -31,6 +31,9 @@
 #if defined(TEENSYDUINO)
 #include <Audio.h>
 #endif
+
+#include "../CLFM.h"
+
 #include "fm_op_kernel.h"
 #include "synth.h"
 #include "fenv.h"

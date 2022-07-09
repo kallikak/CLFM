@@ -19,12 +19,13 @@
 
 #include <math.h>
 #include <stdlib.h>
+
+#include "../CLFM.h"
+
 #include "synth.h"
 #include "freqlut.h"
 #include "exp2.h"
 #include "dx7note.h"
-
-#include "../CLFM.h"
 
 // #define DEBUG
 
@@ -191,7 +192,7 @@ void Dx7Note::init(uint8_t algorithm, float midinote, int velocity) {
 
     int mode = 0;
     int coarse = (int)(config.coarse[op]);
-    int fine = config.fine[op];
+    int fine = config.fold ? 0 : config.fine[op];
     int detune = config.detune;
     int32_t freq = osc_freq(midinote, mode, coarse, fine, detune);
     opMode[op] = mode;
@@ -235,6 +236,7 @@ void Dx7Note::compute(int32_t *buf, FmCore* core) {
 #endif
 
     params_[op].level_in = level;
+    params_[op].fold = config.fold ? config.fine[op] : 0;
 #ifdef DEBUG
     sum += (level >> 16);
 #endif    
@@ -303,7 +305,7 @@ void Dx7Note::updatePitchOnly(float pitch)
 {
   for (int op = 0; op < 4; op++) {
     int coarse = (int)(config.coarse[op]);
-    int fine = config.fine[op];
+    int fine = config.fold ? 0 : config.fine[op];
     basepitch_[op] = osc_freq(pitch, 0, coarse, fine, config.detune);
   }
 }
@@ -318,7 +320,7 @@ void Dx7Note::update(uint8_t algorithm, float midinote, int velocity, bool refre
     int outlevel = min(100, config.level[op] * config.scale[op]);
     int mode = 0;
     int coarse = (int)(config.coarse[op]);
-    int fine = config.fine[op];
+    int fine = config.fold ? 0 : config.fine[op];
     int detune = config.detune;
     int32_t freq = osc_freq(midinote, mode, coarse, fine, detune);
     basepitch_[op] = freq;

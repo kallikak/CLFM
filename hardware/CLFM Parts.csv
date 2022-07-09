@@ -19,6 +19,8 @@ Digikey
 1	CONN RCPT USB2.0 TYPEA 4POS R/A	AU-Y1005-2	AE11191-ND
 1 6MMx6MM TACT SWITCH 13MM ACTUATOR 2-1825910-7 450-1642-ND
 
+Also, I strongly recommend using female headers on the PCB for the Teensy.
+
 Thonk
 
 10	B10K - CENTRE DETENT - D shaft - Alpha Vertical 9mm Potentiometer - MPN: RD901F-40-15F-B10K

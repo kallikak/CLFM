@@ -29,8 +29,6 @@
 
 // #define DEBUG
 
-const int FEEDBACK_BITDEPTH = 8;
-
 int32_t midinote_to_logfreq(int midinote) {
   //const int32_t base = 50857777;  // (1 << 24) * (log(440) / log(2) - 69/12)
   const int32_t base = 50857777;  // (1 << 24) * (LOG_FUNC(440) / LOG_FUNC(2) - 69/12)
@@ -199,8 +197,7 @@ void Dx7Note::init(uint8_t algorithm, float midinote, int velocity) {
     basepitch_[op] = freq;
   }
   algorithm_ = algorithm;
-  int feedback = config.feedback;
-  fb_shift_ = feedback != 0 ? FEEDBACK_BITDEPTH - feedback : 16;
+  fb_factor_ = config.feedback < 95 ? config.feedback / 300.0 : 1.5;
 }
 
 void Dx7Note::setOPDrone(uint8_t op, bool set) {
@@ -264,7 +261,7 @@ void Dx7Note::compute(int32_t *buf, FmCore* core) {
   }
 #endif
 
-  core->render(buf, params_, algorithm_, fb_buf_, fb_shift_);
+  core->render(buf, params_, algorithm_, fb_buf_, fb_factor_);
 }
 
 void Dx7Note::keyup() {
@@ -340,7 +337,7 @@ void Dx7Note::update(uint8_t algorithm, float midinote, int velocity, bool refre
   }
   algorithm_ = algorithm;
   int feedback = config.feedback;
-  fb_shift_ = feedback != 0 ? FEEDBACK_BITDEPTH - feedback : 16;
+  fb_factor_ = config.feedback < 95 ? config.feedback / 300.0 : 1.5;
 }
 
 void Dx7Note::peekVoiceStatus(VoiceStatus &status) {

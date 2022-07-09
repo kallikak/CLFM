@@ -65,7 +65,7 @@ class Dx7Note {
     FmOpParams params_[4];
     int32_t basepitch_[4];
     int32_t fb_buf_[2];
-    int32_t fb_shift_;
+    float fb_factor_;
     int32_t opMode[4];
     int algorithm_;
 };

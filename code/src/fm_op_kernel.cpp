@@ -114,18 +114,22 @@ void FmOpKernel::compute_pure(int32_t *output, int32_t phase0,
 #define noDOUBLE_ACCURACY
 #define HIGH_ACCURACY
 
+static int count = 0;
 void FmOpKernel::compute_fb(int32_t *output, int32_t phase0, int32_t freq, 
                             wavetype wave, int16_t fold, int32_t gain1, int32_t gain2,
-                            int32_t *fb_buf, int fb_shift, bool add) {
+                            int32_t *fb_buf, float fb_factor, bool add) {
   int32_t dgain = (gain2 - gain1 + (_N_ >> 1)) >> LG_N;
   int32_t gain = gain1;
   int32_t phase = phase0;
   int32_t y0 = fb_buf[0];
   int32_t y = fb_buf[1];
+  if (fold > 0)
+    fb_factor /= (1.0 + fold / 3);   // reduce the effect of feedback when folding
   if (add) {
-    for (int i = 0; i < _N_; i++) {
+    for (int i = 0; i < _N_; i++) { 
       gain += dgain;
-      int32_t scaled_fb = (y0 + y) >> (fb_shift + 1);
+      int32_t avg_sample = (y0 + y) >> 1;
+      int32_t scaled_fb = avg_sample * fb_factor;
       y0 = y;
       y = getRaw(phase + scaled_fb, wave, fold);
       y = ((int64_t)y * (int64_t)gain) >> 24;
@@ -135,7 +139,8 @@ void FmOpKernel::compute_fb(int32_t *output, int32_t phase0, int32_t freq,
   } else {
     for (int i = 0; i < _N_; i++) {
       gain += dgain;
-      int32_t scaled_fb = (y0 + y) >> (fb_shift + 1);
+      int32_t avg_sample = (y0 + y) >> 1;
+      int32_t scaled_fb = avg_sample * fb_factor;
       y0 = y;
       y = getRaw(phase + scaled_fb, wave, fold);
       y = ((int64_t)y * (int64_t)gain) >> 24;

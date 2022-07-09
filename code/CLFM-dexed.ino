@@ -913,7 +913,7 @@ void loop()
   }
   if (potchange(&controls.feedbackpot, now, false, false))
   {
-    int newfb = round(controls.feedbackpot.value / 127.0 * 7);
+    int newfb = round(controls.feedbackpot.value / 127.0 * 100);
     if (config.feedback != newfb)
     {
       config.feedback = newfb;

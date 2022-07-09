@@ -182,7 +182,7 @@ void FmCore::dump() {
 // #endif
 }
 
-void FmCore::render(int32_t *output, FmOpParams *params, int algorithm, int32_t *fb_buf, int feedback_shift) {
+void FmCore::render(int32_t *output, FmOpParams *params, int algorithm, int32_t *fb_buf, float fb_factor) {
   const int kLevelThresh = 1120;
   const FmAlgorithm alg = algorithms[algorithm];
   bool has_contents[3] = { true, false, false };
@@ -205,22 +205,22 @@ void FmCore::render(int32_t *output, FmOpParams *params, int algorithm, int32_t 
       }
       if (inbus == 0 || !has_contents[inbus]) {
         // todo: more than one op in a feedback loop
-        if ((flags & 0xc0) == 0xc0 && feedback_shift < 16) {
+        if ((flags & 0xc0) == 0xc0 && fb_factor > 0.01) {
           // cout << op << " fb " << inbus << outbus << add << endl;
           FmOpKernel::compute_fb(outptr, param.phase, param.freq, 
                                  wave, param.fold, gain1, gain2,
-                                 fb_buf, feedback_shift, add);
+                                 fb_buf, fb_factor, add);
         } else {
           // cout << op << " pure " << inbus << outbus << add << endl;
           FmOpKernel::compute_pure(outptr, param.phase, param.freq, wave,
                                    param.fold, gain1, gain2, add);
         }
       } else {
-        if ((flags & 0xc0) == 0xc0 && feedback_shift < 16) {
+        if ((flags & 0xc0) == 0xc0 && fb_factor > 0.01) {
           // cout << op << " fb " << inbus << outbus << add << endl;
           FmOpKernel::compute_fb(outptr, param.phase, param.freq, 
                                  wave, param.fold, gain1, gain2,
-                                 fb_buf, feedback_shift, has_contents[inbus]);
+                                 fb_buf, fb_factor, has_contents[inbus]);
           outptr = (outbus == 0) ? output : buf_[outbus - 1].get();                                 
         }
 

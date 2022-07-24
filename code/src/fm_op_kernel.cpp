@@ -27,17 +27,25 @@
 // wavefolders for the all operators are carriers algorithm 
 int32_t calcfold(int32_t v, float foldamount) {
   const long thresh = 1 << 24;
+  
   if (foldamount > 0)
   {
     float vf = (1.0 * v) / thresh;
-    vf = (1.0 + foldamount) * vf;
-    vf = (vf > 0 ? 1 : -1) * 2 * fabs(vf / 2 - round(vf / 2));
+    vf = (1.0 + foldamount) * vf / 2;
+    vf = (vf > 0 ? 1 : -1) * 2 * fabs(vf - round(vf));
+    return (int32_t)(vf * thresh);
+  }
+  else if (foldamount < 0)
+  {
+    float vf = (1.0 * v) / thresh;
+    vf = foldamount * vf / 2;
+    if (vf > 1.0)
+      vf = 1 + (vf - 1) / 10;
+    vf = (vf > 0 ? 1 : -1) * 2 * fabs(vf - round(vf));
     return (int32_t)(vf * thresh);
   }
   return v;
 }
-
-#define MAXFOLD 8.0
 
 int32_t getRaw(int32_t phase, wavetype wave, int32_t fold) {
   switch (wave) {
@@ -50,12 +58,12 @@ int32_t getRaw(int32_t phase, wavetype wave, int32_t fold) {
       return Sqr::lookup(phase);
     case SINFOLD:
     {
-      float foldamount = fold > 0 ? MAXFOLD * fold / 50.0 : 0;
+      float foldamount = MAXFOLD * fold / 200.0;
       return calcfold(Sin::lookup(phase), foldamount);
     }
     case TRIFOLD:
     {
-      float foldamount = fold > 0 ? MAXFOLD * fold / 50.0 : 0;
+      float foldamount = MAXFOLD * fold / 200.0;
       return calcfold(Tri::lookup(phase), foldamount);
     }
   }
@@ -114,7 +122,6 @@ void FmOpKernel::compute_pure(int32_t *output, int32_t phase0,
 #define noDOUBLE_ACCURACY
 #define HIGH_ACCURACY
 
-static int count = 0;
 void FmOpKernel::compute_fb(int32_t *output, int32_t phase0, int32_t freq, 
                             wavetype wave, int16_t fold, int32_t gain1, int32_t gain2,
                             int32_t *fb_buf, float fb_factor, bool add) {

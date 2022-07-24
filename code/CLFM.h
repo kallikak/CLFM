@@ -1,16 +1,9 @@
 #pragma once
 
-#define PROTOTYPE 1
-#define RELEASE_1 2
-
-//#define CLFM_VERSION PROTOTYPE
-#define CLFM_VERSION RELEASE_1
-
-#if CLFM_VERSION == PROTOTYPE
-#define N_ALGS 8
-#else
 #define N_ALGS 10
-#endif
+
+#define MAXFOLD 8.0
+#define MAXFOLDPARAM 256
 
 typedef enum {SIN, TRI, SQR, SINFOLD, TRIFOLD} wavetype;
 

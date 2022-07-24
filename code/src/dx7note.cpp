@@ -336,7 +336,6 @@ void Dx7Note::update(uint8_t algorithm, float midinote, int velocity, bool refre
     env_[op].update(a, d, s, r, env_[op].isDroning(), outlevel, refreshEnv);
   }
   algorithm_ = algorithm;
-  int feedback = config.feedback;
   fb_factor_ = config.feedback < 95 ? config.feedback / 300.0 : 1.5;
 }
 

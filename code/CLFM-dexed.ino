@@ -6,13 +6,11 @@
 #include <SPI.h>
 #include <SerialFlash.h>
 
-#if CLFM_VERSION == RELEASE_1
 #include <USBHost_t36.h>
 
 USBHost myusb;
 USBHub hub1(myusb);
 MIDIDevice midi1(myusb);
-#endif
 
 bool midimode = false;
 #define POLYPHONY 16
@@ -103,10 +101,8 @@ int updateOneEnv = -1;
 
 #define FEEDBACK_POT A16
 
-#if CLFM_VERSION == RELEASE_1
 #define QUANTISE_SW 0
 #define FEEDBACK_SW 9
-#endif
 
 typedef enum { AD, ASR, ADSR, CTS } envCtrlMode;
 
@@ -117,11 +113,7 @@ typedef enum { AD, ASR, ADSR, CTS } envCtrlMode;
 const int envModeSw[] = { ENV_MODE_CTS, ENV_MODE_ADSR, ENV_MODE_ASR };
 
 #define CV_IN A17
-#if CLFM_VERSION == PROTOTYPE
-#define GATE_IN 0
-#else
 #define GATE_IN 1
-#endif
 
 #define PITCH_OFFSET 60
 #define MIDI_NOTE_OFFSET 24
@@ -223,7 +215,10 @@ void updatePot(potval *thepot, int pin, unsigned long t, int shift, bool invert,
   }
   if (average)
   {
-    v = (*thepot).rawvalue = (average - 1) * (*thepot).rawvalue / average + v  / average;
+    if (centre && abs(v - ANALOG_MID) < 2)
+      ;
+    else
+      v = (*thepot).rawvalue = (average - 1) * (*thepot).rawvalue / average + v  / average;
   }
   (*thepot).rawvalue = v;
   (*thepot).value = v >> shift;
@@ -234,21 +229,12 @@ operatorType getOpType(int op, int algo)
 {
   switch (op)
   {
-#if CLFM_VERSION == PROTOTYPE
-    case 2:
-      return algo >= 5 ? CARRIER : MODULATOR;
-    case 1:
-      return algo >= 4 ? CARRIER : MODULATOR;
-    case 0:
-      return algo == 7 ? CARRIER : MODULATOR;
-#else
     case 2:
       return algo >= 6 ? CARRIER : MODULATOR;
     case 1:
       return algo == 4 || algo >= 6 ? CARRIER : MODULATOR;
     case 0:
       return algo == 5 || algo == 9 ? CARRIER : MODULATOR;
-#endif      
     case 3:
     default:
       return CARRIER;
@@ -290,19 +276,6 @@ envCtrlMode getEnvMode()
 
 int getAlgorithm()
 {
-#if CLFM_VERSION == PROTOTYPE
-  static int pins[] = {13, 12, 11, 10, 5, 6, 7, 8};
-  int i;
-  for (i = 7; i >= 0; --i)
-  {
-    if (digitalRead(pins[i]) == LOW)
-      break;
-  }
-  if (i == 8)
-    return config.algorithm;
-  
-  return i;
-#else
   static int pins[] = {28, 13, 12, 11, 10, 8, 7, 6, 5};
   int a = 0;  // all high => algo 1
   int i;
@@ -322,7 +295,6 @@ int getAlgorithm()
   }
   
   return a;
-#endif  
 }
 
 void setAlgorithmLEDs(int algo)
@@ -513,7 +485,8 @@ bool handleCoarseTuning(int i, int v)
 
 bool handleFineTuning(int i, int v)
 {
-  v = map(v, 0, 127, -50, 50);
+  int limit = config.fold ? MAXFOLDPARAM : 50;
+  v = map(v, 0, config.fold ? 1023 : 127, -limit, limit);
   if (config.fine[i] != v)
   {
     config.fine[i] = v;
@@ -580,19 +553,11 @@ void updateWavetypes()
         config.wave[0] = config.wave[1] = config.wave[3] = SQR;
         config.wave[2] = TRI;
         break;
-#if CLFM_VERSION == RELEASE_1
       case 6:
-#else      
-      case 5:
-#endif      
         config.wave[1] = SQR;
         config.wave[3] = TRI;
         break;
-#if CLFM_VERSION == RELEASE_1
       case 9:
-#else      
-      case 7:
-#endif
         config.fold = true;
         config.wave[0] = config.wave[1] = TRIFOLD;
         config.wave[2] = config.wave[3] = SINFOLD;
@@ -627,7 +592,6 @@ void handle_gate()
   }
 }
 
-#if CLFM_VERSION == RELEASE_1
 bool checkswitches()
 {
   bool update = false;
@@ -639,7 +603,6 @@ bool checkswitches()
   }
   return update;
 }
-#endif
 
 void checkSerialControl()
 {
@@ -735,11 +698,9 @@ void setup()
   pinMode(11, INPUT_PULLUP);
   pinMode(12, INPUT_PULLUP);
   pinMode(13, INPUT_PULLUP);
-#if CLFM_VERSION == RELEASE_1
   pinMode(28, INPUT_PULLUP);
   pinMode(QUANTISE_SW, INPUT_PULLUP);
   pinMode(FEEDBACK_SW, INPUT_PULLUP);
-#endif  
   pinMode(FEEDBACK_POT, INPUT);
 
   pinMode(GATE_IN, INPUT_PULLUP);
@@ -782,7 +743,6 @@ void setup()
   config.detune = 0;
   config.sync = false;
 
-#if CLFM_VERSION == RELEASE_1
   myusb.begin();
 
   midi1.setHandleNoteOn(handleNoteOn);
@@ -790,7 +750,7 @@ void setup()
   midi1.setHandlePitchChange(handlePitchChange);
   midi1.setHandleControlChange(handleControlChange);
   midi1.setHandleAfterTouchChannel(handleAfterTouchChannel);
-#endif
+
   usbMIDI.setHandleNoteOn(handleNoteOn);
   usbMIDI.setHandleNoteOff(handleNoteOff);
   usbMIDI.setHandlePitchChange(handlePitchChange);
@@ -825,28 +785,15 @@ void loop()
   loopcount++;
   for (i = 0; i < 4; ++i)
   {
-#if CLFM_VERSION == PROTOTYPE
-    updatePot(&controls.finepot[i], finePots[i], now, ANALOG_SHIFT, true, true, NO_AVG);
-    updatePot(&controls.coarsepot[i], coarsePots[i], now, ANALOG_SHIFT, i == 0, true, NO_AVG);
-    updatePot(&controls.levelpot[i], levelSliders[i], now, ANALOG_SHIFT, false, false, 20);
-    updatePot(&controls.envpot[i], envPots[i], now, ANALOG_SHIFT, true, false, NO_AVG);
-#else
-    updatePot(&controls.finepot[i], finePots[i], now, ANALOG_SHIFT, false, true, NO_AVG);
-    updatePot(&controls.coarsepot[i], coarsePots[i], now, ANALOG_SHIFT, false, true, NO_AVG);
+    updatePot(&controls.finepot[i], finePots[i], now, config.fold ? 2 : ANALOG_SHIFT, false, true, config.fold ? 5 : NO_AVG); // smooth the folding a bit
+    updatePot(&controls.coarsepot[i], coarsePots[i], now, ANALOG_SHIFT, true, true, NO_AVG);
     // slow down the modulator response to minimise stepping
-    updatePot(&controls.levelpot[i], levelSliders[i], now, ANALOG_SHIFT, false, false, getOpType(i, config.algorithm) == CARRIER ? 4 : 10);
+    updatePot(&controls.levelpot[i], levelSliders[i], now, ANALOG_SHIFT, true, false, getOpType(i, config.algorithm) == CARRIER ? 4 : 10);
     updatePot(&controls.envpot[i], envPots[i], now, ANALOG_SHIFT, false, false, NO_AVG);
-#endif
   }
-#if CLFM_VERSION == PROTOTYPE
-  updatePot(&controls.feedbackpot, FEEDBACK_POT, now, ANALOG_SHIFT, true, false, NO_AVG);
-#else
   updatePot(&controls.feedbackpot, FEEDBACK_POT, now, ANALOG_SHIFT, false, false, NO_AVG);
-#endif
 
-#if CLFM_VERSION == RELEASE_1
   needsUpdate = checkswitches();  
-#endif  
   
   int alg = getAlgorithm();
   if (alg != config.algorithm)
@@ -933,11 +880,9 @@ void loop()
       printConfig();
   }
   
-#if CLFM_VERSION == RELEASE_1
-    myusb.Task();
-    midi1.read();
-#endif  
-    usbMIDI.read();
+  myusb.Task();
+  midi1.read();
+  usbMIDI.read();
   if (!midimode)
   {
   // TODO move the pitch cv handling to a method
@@ -953,25 +898,26 @@ void loop()
         saveraw = median;      
   //    else
   //      saveraw = (n - 1) * saveraw / n + 1.0 * raw  / n;
-  #if CLFM_VERSION == PROTOTYPE
-    /*
-      Calibration data
-      C2 input is 170
-      C7 input is 3620
-      scaling factor f ~ 60 / (3636 - 207)
-      36 + (2950 - 207) * f
-   */
-      const float fbase = 170;
-      const float f = 60.0 / (3620 - fbase);
-  #else    
+//    Serial.println(saveraw);
   /*
     C2 149
     C7 3618
     scaling factor f ~ 60 / (3618 - 149)
   */
-      const float fbase = 149;
-      const float f = 60.0 / (3618 - fbase);
-  #endif    
+  /*
+   * Odessa
+   * 
+      Calibration data
+      C2 input is 33
+      C7 input is 3489
+      scaling factor f ~ 60 / (3636 - 207)
+      36 + (2950 - 207) * f
+   */
+//      const float fbase = 149;
+//      const float f = 60.0 / (3618 - fbase);
+
+      const float fbase = 33;
+      const float f = 60.0 / (3489 - fbase);
     
       float pitch_cv = (saveraw - fbase) * f;
       
@@ -1037,76 +983,6 @@ void loop()
   handleResetButton();
 }
 
-#if CLFM_VERSION == PROTOTYPE
-typedef enum { NONE, OP4FB, OP2FB, QUANTISE, FREE } ResetState;
-
-ResetState resetState = NONE;
-
-void handleResetButton()
-{
-  resetsw->update();
-  if (resetsw->read() == LOW)
-  {
-    long cd = resetsw->duration();
-    if (cd > 5000)
-    {
-      pin_reset();
-    }
-    else if (cd > 3500)
-    {
-      if (resetState != FREE) resetState = FREE;
-    }
-    else if (cd > 2500)
-    {
-      if (resetState != QUANTISE) resetState = QUANTISE;
-    }
-    else if (cd > 1500)
-    {
-      if (resetState != OP2FB) resetState = OP2FB;
-    }
-    else if (cd > 500)
-    {
-      if (resetState != OP4FB) resetState = OP4FB;
-    }
-    handleResetLEDs();
-  }
-  else if (resetsw->rose()) 
-  {
-    Serial.printf("Reset clicked on state %d\n", resetState);
-    switch (resetState)
-    {
-      case OP2FB:
-        feedback2 = true;
-        fm.setAlgorithm(config.algorithm + 8);
-        fm.doRefreshVoice();
-        break;
-      case OP4FB:
-        feedback2 = false;
-        fm.setAlgorithm(config.algorithm);
-        fm.doRefreshVoice();
-        break;
-      case QUANTISE:
-        quantise = true;
-        break;
-      case FREE:
-        quantise = false;
-        break;
-      case NONE:
-        break;
-    }
-    resetState = NONE;
-    setAlgorithmLEDs(config.algorithm);
-  }
-}
-
-void handleResetLEDs()
-{
-  digitalWrite(levelLEDs[3], resetState == OP4FB);
-  digitalWrite(levelLEDs[2], resetState == OP2FB);
-  digitalWrite(levelLEDs[1], resetState == QUANTISE);
-  digitalWrite(levelLEDs[0], resetState == FREE);
-}
-#else
 typedef enum { NONE, PANIC, MIDI, CV, AFTERTOUCH } ResetState;
 
 ResetState resetState = NONE;
@@ -1174,7 +1050,6 @@ void handleResetLEDs()
   digitalWrite(levelLEDs[1], resetState == CV);
   digitalWrite(levelLEDs[0], resetState == AFTERTOUCH);
 }
-#endif
 
 void setMidiMode(bool set)
 {

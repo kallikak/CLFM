@@ -900,18 +900,13 @@ void loop()
   //      saveraw = (n - 1) * saveraw / n + 1.0 * raw  / n;
 //    Serial.println(saveraw);
   /*
-    C2 149
-    C7 3618
-    scaling factor f ~ 60 / (3618 - 149)
-  */
-  /*
    * Odessa
    * 
-      Calibration data
+     Calibration data
       C2 input is 33
       C7 input is 3489
-      scaling factor f ~ 60 / (3636 - 207)
-      36 + (2950 - 207) * f
+      scaling factor f ~ 60 / (3489 - 33)
+      pitch_cv = (raw - 33) * f;
    */
 //      const float fbase = 149;
 //      const float f = 60.0 / (3618 - fbase);

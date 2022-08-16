@@ -68,6 +68,8 @@ class Dx7Note {
     float fb_factor_;
     int32_t opMode[4];
     int algorithm_;
+
+    void calcFeedback();
 };
 
 #endif

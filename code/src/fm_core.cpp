@@ -184,7 +184,7 @@ void FmCore::render(int32_t *output, FmOpParams *params, int algorithm, int32_t 
       }
       if (inbus == 0 || !has_contents[inbus]) {
         // todo: more than one op in a feedback loop
-        if ((flags & 0xc0) == 0xc0 && fb_factor > 0.01) {
+        if ((flags & 0xc0) == 0xc0 && abs(fb_factor) > 0.01) {
           // cout << op << " fb " << inbus << outbus << add << endl;
           FmOpKernel::compute_fb(outptr, param.phase, param.freq, 
                                  wave, param.fold, gain1, gain2,
@@ -195,7 +195,7 @@ void FmCore::render(int32_t *output, FmOpParams *params, int algorithm, int32_t 
                                    param.fold, gain1, gain2, add);
         }
       } else {
-        if ((flags & 0xc0) == 0xc0 && fb_factor > 0.01) {
+        if ((flags & 0xc0) == 0xc0 && abs(fb_factor) > 0.01) {
           // cout << op << " fb " << inbus << outbus << add << endl;
           FmOpKernel::compute_fb(outptr, param.phase, param.freq, 
                                  wave, param.fold, gain1, gain2,

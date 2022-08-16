@@ -197,7 +197,7 @@ void Dx7Note::init(uint8_t algorithm, float midinote, int velocity) {
     basepitch_[op] = freq;
   }
   algorithm_ = algorithm;
-  fb_factor_ = config.feedback < 95 ? config.feedback / 300.0 : 1.5;
+  calcFeedback();
 }
 
 void Dx7Note::setOPDrone(uint8_t op, bool set) {
@@ -336,7 +336,18 @@ void Dx7Note::update(uint8_t algorithm, float midinote, int velocity, bool refre
     env_[op].update(a, d, s, r, env_[op].isDroning(), outlevel, refreshEnv);
   }
   algorithm_ = algorithm;
-  fb_factor_ = config.feedback < 95 ? config.feedback / 300.0 : 1.5;
+  calcFeedback();
+}
+
+void Dx7Note::calcFeedback()
+{
+  int fb = config.feedback;
+#ifdef BIPOLAR_FEEDBACK
+  fb -= 50;
+  fb_factor_ = fb < 48.5 ? fb / 75.0 : 1.5;
+#else  
+  fb_factor_ = fb < 95 ? fb / 150.0 : 1.5;
+#endif  
 }
 
 void Dx7Note::peekVoiceStatus(VoiceStatus &status) {

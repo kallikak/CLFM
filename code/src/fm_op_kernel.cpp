@@ -130,28 +130,43 @@ void FmOpKernel::compute_fb(int32_t *output, int32_t phase0, int32_t freq,
   int32_t phase = phase0;
   int32_t y0 = fb_buf[0];
   int32_t y = fb_buf[1];
+  bool sq = fb_factor < 0;
+  if (sq)
+    fb_factor = -fb_factor / 1.5;
   if (fold > 0)
     fb_factor /= (1.0 + fold / 3);   // reduce the effect of feedback when folding
   if (add) {
     for (int i = 0; i < _N_; i++) { 
       gain += dgain;
+      // int32_t avg_sample = (y0 + y) >> 1;
+      // int32_t avg_sample = y0 + (sq ? ((int64_t)y * (int64_t)y) >> 24 : y) >> 1;
       int32_t avg_sample = (y0 + y) >> 1;
+      if (sq)
+        avg_sample = ((int64_t)avg_sample * (int64_t)avg_sample) >> 24;
       int32_t scaled_fb = avg_sample * fb_factor;
+      // scaled_fb = ((int64_t)scaled_fb * (int64_t)scaled_fb) >> 24;
       y0 = y;
       y = getRaw(phase + scaled_fb, wave, fold);
-      y = ((int64_t)y * (int64_t)gain) >> 24;
-      output[i] += y;
+      // y = ((int64_t)y * (int64_t)gain) >> 24;
+      // output[i] += y;
+      output[i] += ((int64_t)y * (int64_t)gain) >> 24;
       phase += freq;
     }
   } else {
     for (int i = 0; i < _N_; i++) {
       gain += dgain;
+      // int32_t avg_sample = (y0 + y) >> 1;
+      // int32_t avg_sample = y0 + (sq ? ((int64_t)y * (int64_t)y) >> 24 : y) >> 1;
       int32_t avg_sample = (y0 + y) >> 1;
+      if (sq)
+        avg_sample = ((int64_t)avg_sample * (int64_t)avg_sample) >> 24;
       int32_t scaled_fb = avg_sample * fb_factor;
+      // scaled_fb = ((int64_t)scaled_fb * (int64_t)scaled_fb) >> 24;
       y0 = y;
       y = getRaw(phase + scaled_fb, wave, fold);
-      y = ((int64_t)y * (int64_t)gain) >> 24;
-      output[i] = y;
+      // y = ((int64_t)y * (int64_t)gain) >> 24;
+      // output[i] = y;
+      output[i] = ((int64_t)y * (int64_t)gain) >> 24;
       phase += freq;
     }
   }

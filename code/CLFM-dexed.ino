@@ -124,7 +124,9 @@ volatile float note = -1;
  
 #define RESET 31
 
-const char *coarseFactors[] = {"1/128", "1/64", "1/32", "1/16", "1/8", "1/4", "1/2", "1", "2", "3", "4", "5", "6", "7", "8", "Overflow"};
+const char *coarseFactors[] = {
+  "1/128", "1/96", "1/64", "1/48", "1/32", "1/24", "1/16", "1/12", "1/8", "1/7", "1/6", "1/5", "1/4", "1/3", "1/2", 
+  "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "Overflow"};
 
 typedef enum { CARRIER, MODULATOR } operatorType;
 
@@ -473,7 +475,7 @@ bool handleEnvelopes(int i, int v, envCtrlMode mode, int algo)
 
 bool handleCoarseTuning(int i, int v)
 {
-  v = map(v, 0, 127, 0, 14);
+  v = map(v, 0, 127, 0, 30);
   coarseAdj newcoarse = (coarseAdj)v;
   if (config.coarse[i] != newcoarse)
   {

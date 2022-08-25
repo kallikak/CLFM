@@ -5,7 +5,7 @@
 #define MAXFOLD 8.0
 #define MAXFOLDPARAM 256
 
-// #define BIPOLAR_FEEDBACK
+#define BIPOLAR_FEEDBACK
 
 typedef enum {SIN, TRI, SQR, SINFOLD, TRIFOLD} wavetype;
 
